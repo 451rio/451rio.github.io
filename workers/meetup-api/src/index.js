@@ -194,7 +194,7 @@ async function handleRegister(request, env, slug, corsOrigin) {
       .run();
 
     if (message.includes("UNIQUE constraint failed: registrations.meetup_slug, registrations.email")) {
-      return json({ error: "Este e-mail já foi inscrito neste meetup" }, 409, corsOrigin);
+      return json({ error: "Não foi possível concluir a inscrição" }, 409, corsOrigin);
     }
     return json({ error: "Falha ao registrar inscrição" }, 500, corsOrigin);
   }
