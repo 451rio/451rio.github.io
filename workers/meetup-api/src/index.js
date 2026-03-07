@@ -23,7 +23,26 @@ function getCorsOrigin(request, env) {
 }
 
 function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  if (typeof email !== "string") return false;
+  if (email.length < 6 || email.length > 254) return false;
+  if (email.includes(" ")) return false;
+
+  const atIndex = email.indexOf("@");
+  if (atIndex <= 0) return false;
+  if (atIndex !== email.lastIndexOf("@")) return false;
+
+  const local = email.slice(0, atIndex);
+  const domain = email.slice(atIndex + 1);
+
+  if (!local || !domain) return false;
+  if (local.length > 64) return false;
+  if (domain.startsWith(".") || domain.endsWith(".")) return false;
+  if (domain.includes("..")) return false;
+
+  const lastDot = domain.lastIndexOf(".");
+  if (lastDot <= 0 || lastDot === domain.length - 1) return false;
+
+  return true;
 }
 
 function normalizeDocument(document) {
