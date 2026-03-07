@@ -120,17 +120,28 @@
       Carregando disponibilidade...
     </p>
     <form id="meetup-registration-form" class="registration-form" data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev" data-meetup-slug="meetup-25-03-2026">
-      <input type="text" name="name" placeholder="Nome completo" required>
-      <input type="email" name="email" placeholder="E-mail" required>
-      <input type="text" name="document" placeholder="Documento (CPF/RG)" required>
+      <div class="registration-field">
+        <label for="reg-name">Nome completo</label>
+        <input id="reg-name" type="text" name="name" placeholder="Ex: Heitor Gouvea" required>
+      </div>
+      <div class="registration-field">
+        <label for="reg-email">E-mail</label>
+        <input id="reg-email" type="email" name="email" placeholder="seuemail@dominio.com" required>
+      </div>
+      <div class="registration-field registration-field-full">
+        <label for="reg-document">Documento</label>
+        <input id="reg-document" type="text" name="document" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" required>
+        <small id="cpf-help" class="registration-help">Apenas CPF válido será aceito.</small>
+      </div>
       <label class="registration-consent">
         <input type="checkbox" name="consentLgpd" required>
         Autorizo o uso dos meus dados para gestão da inscrição deste meetup.
       </label>
-      <button class="btn btn-primary" type="submit" id="registration-submit">
-        Inscrever-se
-      </button>
-      <p class="registration-feedback" id="registration-feedback" aria-live="polite"></p>
+      <div class="registration-actions">
+        <button class="btn btn-primary" type="submit" id="registration-submit">
+          Inscrever-se
+        </button>
+      </div>
     </form>
   </section>
 
@@ -159,6 +170,14 @@
     </div>
   </section>
 </main>
+
+<div class="modal" id="registrationFeedbackModal" aria-hidden="true">
+  <div class="modal-content modal-content--feedback">
+    <button class="modal-close" data-close aria-label="Fechar">✕</button>
+    <h3 id="registration-feedback-title" class="registration-feedback-title"></h3>
+    <p id="registration-feedback-message" class="registration-feedback-message"></p>
+  </div>
+</div>
 
 <script src="/assets/js/meetup-registration.js"></script>
 

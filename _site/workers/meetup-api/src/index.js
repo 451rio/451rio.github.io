@@ -11,9 +11,15 @@ function json(data, status = 200, corsOrigin = "*") {
 }
 
 function getCorsOrigin(request, env) {
+  const allowedOrigins = String(env.ALLOWED_ORIGIN || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
   const origin = request.headers.get("Origin");
-  if (!origin) return "*";
-  return origin === env.ALLOWED_ORIGIN ? origin : env.ALLOWED_ORIGIN;
+  if (!origin) return allowedOrigins[0] || "*";
+  if (allowedOrigins.includes(origin)) return origin;
+  return allowedOrigins[0] || "*";
 }
 
 function isValidEmail(email) {
@@ -67,7 +73,17 @@ async function encryptDocument(document, env) {
 }
 
 async function handleStatus(env, slug, corsOrigin) {
-  const meetup = await getMeetupBySlug(env.DB, slug);
+  let meetup;
+  try {
+    meetup = await getMeetupBySlug(env.DB, slug);
+  } catch {
+    return json(
+      { error: "Database not initialized. Apply D1 migrations before using the API." },
+      500,
+      corsOrigin
+    );
+  }
+
   if (!meetup) return json({ error: "Meetup not found" }, 404, corsOrigin);
 
   const isFull = meetup.registrations_count >= meetup.capacity || meetup.is_open !== 1;
@@ -76,9 +92,6 @@ async function handleStatus(env, slug, corsOrigin) {
       slug: meetup.slug,
       title: meetup.title,
       eventDate: meetup.event_date,
-      capacity: meetup.capacity,
-      registered: meetup.registrations_count,
-      spotsLeft: Math.max(0, meetup.capacity - meetup.registrations_count),
       isOpen: meetup.is_open === 1,
       isFull
     },
@@ -113,7 +126,17 @@ async function handleRegister(request, env, slug, corsOrigin) {
     return json({ error: "Consentimento LGPD é obrigatório" }, 400, corsOrigin);
   }
 
-  const meetup = await getMeetupBySlug(env.DB, slug);
+  let meetup;
+  try {
+    meetup = await getMeetupBySlug(env.DB, slug);
+  } catch {
+    return json(
+      { error: "Database not initialized. Apply D1 migrations before using the API." },
+      500,
+      corsOrigin
+    );
+  }
+
   if (!meetup) return json({ error: "Meetup not found" }, 404, corsOrigin);
 
   if (meetup.is_open !== 1 || meetup.registrations_count >= meetup.capacity) {
@@ -123,34 +146,34 @@ async function handleRegister(request, env, slug, corsOrigin) {
   const encryptedDocument = await encryptDocument(document, env);
   const documentLast4 = document.slice(-4);
 
+  const gate = await env.DB
+    .prepare(
+      "UPDATE meetups SET registrations_count = registrations_count + 1, updated_at = CURRENT_TIMESTAMP WHERE slug = ? AND is_open = 1 AND registrations_count < capacity"
+    )
+    .bind(slug)
+    .run();
+
+  if (!gate.meta || gate.meta.changes !== 1) {
+    return json({ error: "Inscrições encerradas para este meetup" }, 409, corsOrigin);
+  }
+
   try {
-    await env.DB.exec("BEGIN IMMEDIATE");
-
-    const gate = await env.DB
-      .prepare(
-        "UPDATE meetups SET registrations_count = registrations_count + 1, updated_at = CURRENT_TIMESTAMP WHERE slug = ? AND is_open = 1 AND registrations_count < capacity"
-      )
-      .bind(slug)
-      .run();
-
-    if (!gate.meta || gate.meta.changes !== 1) {
-      await env.DB.exec("ROLLBACK");
-      return json({ error: "Inscrições encerradas para este meetup" }, 409, corsOrigin);
-    }
-
     await env.DB
       .prepare(
         "INSERT INTO registrations (meetup_slug, name, email, document_encrypted, document_last4, consent_lgpd) VALUES (?, ?, ?, ?, ?, 1)"
       )
       .bind(slug, name, email, encryptedDocument, documentLast4)
       .run();
-
-    await env.DB.exec("COMMIT");
   } catch (err) {
     const message = String(err?.message || err || "");
-    try {
-      await env.DB.exec("ROLLBACK");
-    } catch {}
+
+    // Reverte a reserva de vaga se o insert falhar.
+    await env.DB
+      .prepare(
+        "UPDATE meetups SET registrations_count = CASE WHEN registrations_count > 0 THEN registrations_count - 1 ELSE 0 END, updated_at = CURRENT_TIMESTAMP WHERE slug = ?"
+      )
+      .bind(slug)
+      .run();
 
     if (message.includes("UNIQUE constraint failed: registrations.meetup_slug, registrations.email")) {
       return json({ error: "Este e-mail já foi inscrito neste meetup" }, 409, corsOrigin);
@@ -165,8 +188,6 @@ async function handleRegister(request, env, slug, corsOrigin) {
     {
       ok: true,
       message: "Inscrição realizada com sucesso",
-      registered: updated.registrations_count,
-      spotsLeft: Math.max(0, updated.capacity - updated.registrations_count),
       isFull
     },
     201,

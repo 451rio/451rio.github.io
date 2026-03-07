@@ -754,22 +754,69 @@ footer a {
 
 .registration-form {
   display: grid;
-  gap: 0.7rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  background: rgba(11, 20, 26, 0.55);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.registration-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.registration-field-full {
+  grid-column: 1 / -1;
+}
+
+.registration-field label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: 'DM Mono', monospace;
+}
+
+.registration-help {
+  color: #7f8a92;
+  font-size: 0.78rem;
+}
+
+.registration-help.is-error {
+  color: #ff8f8f;
 }
 
 .registration-form input[type=\"text\"],
 .registration-form input[type=\"email\"] {
   width: 100%;
-  border-radius: 10px;
+  border-radius: 9px;
   border: 1px solid var(--border-soft);
-  padding: 0.75rem 0.9rem;
-  background: rgba(11, 20, 26, 0.75);
+  padding: 0.8rem 0.9rem;
+  background: rgba(5, 10, 14, 0.7);
   color: var(--text-main);
   font-family: inherit;
   font-size: 0.95rem;
 }
 
+.registration-form input[type=\"text\"]::placeholder,
+.registration-form input[type=\"email\"]::placeholder {
+  color: #6e7a82;
+}
+
+.registration-form input[type=\"text\"]:focus,
+.registration-form input[type=\"email\"]:focus {
+  border-color: var(--accent-soft);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(47, 195, 162, 0.12);
+}
+
+.registration-form input.is-invalid {
+  border-color: #ff8f8f;
+  box-shadow: 0 0 0 3px rgba(255, 143, 143, 0.12);
+}
+
 .registration-consent {
+  grid-column: 1 / -1;
   display: inline-flex;
   align-items: flex-start;
   gap: 0.5rem;
@@ -777,10 +824,38 @@ footer a {
   font-size: 0.85rem;
 }
 
-.registration-feedback {
-  min-height: 1.2rem;
-  color: var(--accent-soft);
-  font-size: 0.9rem;
+.registration-actions {
+  grid-column: 1 / -1;
+}
+
+.registration-actions .btn {
+  width: 100%;
+}
+
+.modal-content--feedback {
+  width: min(520px, 92vw);
+  height: auto;
+  min-height: 0;
+  padding: 1.2rem 1.2rem 1rem;
+}
+
+.registration-feedback-title {
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+  padding-right: 1.8rem;
+}
+
+.registration-feedback-message {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+#registrationFeedbackModal.is-success .registration-feedback-title {
+  color: #2fc3a2;
+}
+
+#registrationFeedbackModal.is-error .registration-feedback-title {
+  color: #ff8f8f;
 }
 
 @media (max-width: 960px) {
@@ -923,5 +998,10 @@ footer a {
 
   .talk-layout {
     grid-template-columns: 1fr;
+  }
+
+  .registration-form {
+    grid-template-columns: 1fr;
+    padding: 0.9rem;
   }
 }
