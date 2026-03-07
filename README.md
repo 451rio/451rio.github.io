@@ -74,6 +74,7 @@ O site continua estático em Jekyll. As inscrições são processadas por API se
 Configuração detalhada em `workers/meetup-api/README.md`.
 
 Documentação operacional completa em `docs/meetup-subscriptions.md`.
+Guia de segurança da aplicação em `docs/security.md`.
 
 ## Privacidade
 
