@@ -1,0 +1,53 @@
+name: ZAP Baseline Scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Base URL to scan"
+        required: false
+        default: "https://hackinbrasil.com.br"
+  schedule:
+    - cron: "0 6 * * 1"
+  push:
+    branches: ["main"]
+    paths:
+      - "index.html"
+      - "meetup-25-03-2026.html"
+      - "codigo-de-conduta.html"
+      - "politica-de-privacidade.html"
+      - "assets/**"
+      - ".github/workflows/zap.yml"
+
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        path:
+          - "/"
+          - "/meetup-25-03-2026/"
+
+    steps:
+      - name: Resolve target
+        id: target
+        run: |
+          if [ -n "${{ github.event.inputs.target_url }}" ]; then
+            BASE_URL="${{ github.event.inputs.target_url }}"
+          else
+            BASE_URL="https://hackinbrasil.com.br"
+          fi
+          BASE_URL="${BASE_URL%/}"
+          echo "url=${BASE_URL}${{ matrix.path }}" >> "$GITHUB_OUTPUT"
+
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ steps.target.outputs.url }}
+          cmd_options: "-a"
+          fail_action: false
+          allow_issue_writing: false
