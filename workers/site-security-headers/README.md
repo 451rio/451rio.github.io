@@ -40,10 +40,11 @@ UPSTREAM_ORIGIN = "https://hackinbrasil.github.io"
 npx wrangler deploy
 ```
 
-4. As rotas do domínio são aplicadas pelo `wrangler.toml` no deploy:
+4. Configure as rotas manualmente no Cloudflare (dashboard ou `wrangler.toml`) apenas quando o upstream não redirecionar de volta para o mesmo domínio.
 
-- `hackinbrasil.com.br/*`
-- `www.hackinbrasil.com.br/*`
+Importante:
+- Se `UPSTREAM_ORIGIN` for `https://hackinbrasil.github.io` e o repositório tiver `CNAME` para `hackinbrasil.com.br`, aplicar rota em `hackinbrasil.com.br/*` causa loop de redirecionamento.
+- Para usar rota no domínio principal com Worker-proxy, prefira um origin dedicado (ex.: subdomínio sem Worker) para evitar recursão.
 
 ## Observações operacionais
 
