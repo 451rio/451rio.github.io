@@ -5,6 +5,4 @@ timezone: America/Sao_Paulo
 markdown: kramdown
 plugins: []
 exclude:
-  - Gemfile
-  - Gemfile.lock
   - README.md

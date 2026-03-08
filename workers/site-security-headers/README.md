@@ -40,10 +40,10 @@ UPSTREAM_ORIGIN = "https://hackinbrasil.github.io"
 npx wrangler deploy
 ```
 
-4. As rotas do domínio são aplicadas pelo `wrangler.toml` no deploy:
+4. No painel da Cloudflare, mapear rota do Worker para o domínio:
 
 - `hackinbrasil.com.br/*`
-- `www.hackinbrasil.com.br/*`
+- `www.hackinbrasil.com.br/*` (se o subdomínio estiver ativo)
 
 ## Observações operacionais
 
