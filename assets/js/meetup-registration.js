@@ -21,6 +21,29 @@
     feedbackModal.classList.add("open");
   }
 
+  function setSuccessFeedbackWithWhatsappInvite() {
+    const whatsappInviteUrl = "https://chat.whatsapp.com/D4vKksmiQ53JpVMih0PF4b?mode=hq2tcli";
+    const whatsappInviteLink = document.createElement("a");
+
+    feedbackTitle.textContent = "Inscrição confirmada";
+    feedbackMessage.textContent = "";
+    feedbackMessage.append("Inscrição confirmada com sucesso.");
+    feedbackMessage.append(document.createElement("br"));
+    feedbackMessage.append("Participe também do nosso ");
+
+    whatsappInviteLink.href = whatsappInviteUrl;
+    whatsappInviteLink.target = "_blank";
+    whatsappInviteLink.rel = "noopener noreferrer";
+    whatsappInviteLink.textContent = "grupo no WhatsApp";
+
+    feedbackMessage.append(whatsappInviteLink);
+    feedbackMessage.append(".");
+
+    feedbackModal.classList.remove("is-success", "is-error");
+    feedbackModal.classList.add("is-success");
+    feedbackModal.classList.add("open");
+  }
+
   if (!apiBase || apiBase.includes("REPLACE-WITH-YOUR-WORKER-DOMAIN")) {
     status.textContent = "Configuração pendente: defina o domínio da API no formulário.";
     submit.disabled = true;
@@ -157,7 +180,7 @@
         return;
       }
 
-      setFeedback("Inscrição confirmada com sucesso.", "success");
+      setSuccessFeedbackWithWhatsappInvite();
       form.reset();
       setCpfErrorState(false);
 
