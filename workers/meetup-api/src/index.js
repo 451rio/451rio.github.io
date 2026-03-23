@@ -192,7 +192,7 @@ async function markEmailAsSent(env, jobId, resendEmailId) {
 async function markEmailAsRetry(env, jobId, errorText) {
   await env.DB
     .prepare(
-      "UPDATE email_jobs SET status = 'pending', send_after = datetime('now', '+5 minutes'), updated_at = CURRENT_TIMESTAMP, last_error = ? WHERE id = ?"
+      "UPDATE email_jobs SET status = 'pending', send_after = datetime('now', '+24 hours'), updated_at = CURRENT_TIMESTAMP, last_error = ? WHERE id = ?"
     )
     .bind(errorText, jobId)
     .run();
@@ -208,11 +208,22 @@ async function markEmailAsFailed(env, jobId, errorText) {
 }
 
 async function processPendingEmailJobs(env, limit = 20) {
+  const sentTodayRow = await env.DB
+    .prepare("SELECT COUNT(*) AS total FROM email_jobs WHERE status = 'sent' AND date(sent_at) = date('now')")
+    .first();
+
+  const sentToday = Number(sentTodayRow?.total || 0);
+  const remainingForToday = 100 - sentToday;
+  if (remainingForToday <= 0) {
+    return;
+  }
+
+  const maxBatchSize = Math.min(limit, remainingForToday);
   const pending = await env.DB
     .prepare(
       "SELECT id, meetup_slug, recipient_name, recipient_email, subject, html_body, text_body, attempts FROM email_jobs WHERE status = 'pending' AND send_after <= CURRENT_TIMESTAMP ORDER BY id ASC LIMIT ?"
     )
-    .bind(limit)
+    .bind(maxBatchSize)
     .all();
 
   const rows = Array.isArray(pending.results) ? pending.results : [];

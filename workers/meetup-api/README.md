@@ -87,3 +87,5 @@ Comportamento de UX atual:
 - O conteúdo do e-mail é definido no banco em `email_templates`.
 - Inscrições antigas são carregadas para envio na primeira aplicação da migração `0002`.
 - Para editar próximas mensagens, atualize o registro em `email_templates`.
+- O limite diário está fixo em 100 envios.
+- Quando o envio falha, a próxima tentativa é reagendada para 24 horas depois (até 5 tentativas).
