@@ -170,9 +170,16 @@
       const data = await res.json();
 
       if (!res.ok) {
-        setFeedback(data.error || "Não foi possível concluir a inscrição.", "error");
+        const errorMessage = data.error || "Não foi possível concluir a inscrição.";
+        setFeedback(errorMessage, "error");
         if (res.status === 409) {
-          setClosedState("Inscrições encerradas para este meetup.");
+          const isCapacityError = /inscriç(ã|a)es encerradas/i.test(errorMessage);
+          if (isCapacityError) {
+            setClosedState("Inscrições encerradas para este meetup.");
+            return;
+          }
+          submit.disabled = false;
+          submit.textContent = "Inscrever-se";
         } else {
           submit.disabled = false;
           submit.textContent = "Inscrever-se";

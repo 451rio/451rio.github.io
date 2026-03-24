@@ -104,7 +104,8 @@ Responses:
 
 Side effect:
 
-- Creates an email job scheduled to send after 10 minutes.
+- Tries to create an email job scheduled to send after 10 minutes.
+- Registration remains successful even if email scheduling is temporarily unavailable.
 
 ## Capacity enforcement (no waitlist)
 
