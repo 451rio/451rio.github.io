@@ -1,13 +1,13 @@
 ---
 layout: blog_post
-title: "Hack in Rio: uma conversa com Pedro Buxbaum sobre IA, segurança e comunidade"
+title: "Hack in Brasil: uma conversa com Pedro Buxbaum sobre IA, segurança e comunidade"
 date: 2026-03-31
 author: "Equipe Hack in Brasil"
-description: "Pedro Buxbaum compartilha sua experiência como palestrante no Hack in Rio e reflete sobre IA, riscos em segurança e o papel dos eventos comunitários na formação de talentos."
+description: "Pedro Buxbaum compartilha sua experiência como palestrante no Hack in Brasil e reflete sobre IA, riscos em segurança e o papel dos eventos comunitários na formação de talentos."
 ---
 
 Eventos comunitários têm um papel fundamental no ecossistema de
-cibersegurança, e o Hack in Rio é um ótimo exemplo disso.
+cibersegurança, e o Hack in Brasil é um ótimo exemplo disso.
 
 Conversamos com Pedro Buxbaum, que participou como palestrante do
 evento, para falar sobre sua experiência, o tema da sua apresentação e
@@ -18,7 +18,7 @@ que a IA ganha cada vez mais espaço.
   <img class="blog-person-photo" src="{{ '/assets/images/past speakers/Pedro_Buxbaum.jpg' | relative_url }}" alt="Foto de Pedro Buxbaum">
 </figure>
 
-## Como foi sua experiência como palestrante no Hack in Rio?
+## Como foi sua experiência como palestrante no Hack in Brasil?
 
 Foi uma experiência muito especial.
 
@@ -74,7 +74,7 @@ Esse é um tema muito presente no meu dia a dia no ambiente corporativo.
 E acredito que essa conscientização precisa ir além da área de segurança
 e alcançar qualquer pessoa que utilize essas ferramentas.
 
-## Qual a importância de eventos como o Hack in Rio para a comunidade?
+## Qual a importância de eventos como o Hack in Brasil para a comunidade?
 
 Eventos comunitários são essenciais.
 
@@ -93,7 +93,7 @@ comunidades.
 Sem dúvida.
 
 Novos profissionais precisam de orientação, direcionamento e motivação.
-E eventos como o Hack in Rio entregam exatamente isso.
+E eventos como o Hack in Brasil entregam exatamente isso.
 
 No meu caso, foi uma palestra que assisti em 2017 que mudou
 completamente minha trajetória.
