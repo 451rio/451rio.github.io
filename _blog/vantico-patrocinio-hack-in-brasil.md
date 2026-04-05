@@ -6,7 +6,7 @@ author: "Equipe Hack in Brasil"
 description: "Uma análise sobre como o patrocínio da Vantico ao Hack in Brasil fortalece marca, comunidade e desenvolvimento de talentos em cibersegurança."
 ---
 
-A [Vantico](https://vantico.com.br), empresa de PTaaS, decidiu apoiar o Hack in Brasil com um objetivo claro: ampliar presença de marca para além do seu território atual e se conectar de forma mais próxima com o público técnico de segurança da informação.
+A [Vantico](https://vantico.com.br), empresa de especializada em segurança ofensiva, decidiu apoiar o Hack in Brasil com um objetivo claro: ampliar presença de marca para além do seu território atual e se conectar de forma mais próxima com o público técnico de segurança da informação.
 
 Nós falamos com Kaique Bonato, CEO e fundador da Vantico.
 
@@ -15,7 +15,7 @@ Nós falamos com Kaique Bonato, CEO e fundador da Vantico.
 </figure>
 
 <figure class="blog-sponsor-figure">
-  <img class="blog-sponsor-logo" src="{{ '/assets/images/sponsors/vantico.svg' | relative_url }}" alt="Logo da Vantico">
+  <img class="blog-sponsor-logo" src="{{ '/assets/images/sponsors/vantico-new-logo.jpg' | relative_url }}" alt="Logo da Vantico">
 </figure>
 
 <figure class="blog-instagram-figure">
