@@ -42,7 +42,6 @@ permalink: /blog/
           {% elsif post.excerpt %}
             <p class="blog-card-description">{{ post.excerpt | strip_html | truncate: 170 }}</p>
           {% endif %}
-          <a class="blog-read-link" href="{{ post.url | relative_url }}">Ler artigo</a>
         </article>
       {% endfor %}
     {% else %}
