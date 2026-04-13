@@ -14,7 +14,7 @@ A seguir, reunimos os principais pontos da entrevista com Thiago sobre
 motivação, expectativas, aprendizado prático e o valor de encontros
 presenciais para quem atua em segurança da informação.
 
-<figure class="blog-person-figure">
+<figure class="blog-person-figure blog-person-figure-featured">
   <img class="blog-person-photo" src="{{ '/assets/images/thiago-castro.jpg' | relative_url }}" alt="Foto de Thiago Castro">
 </figure>
 
@@ -90,7 +90,7 @@ informações ajuda a proteger, ensinar com responsabilidade fortalece o
 setor e compartilhar conhecimento melhora a capacidade de perceber,
 entender e agir diante de riscos.
 
-<figure class="blog-instagram-figure">
+<figure class="blog-instagram-figure blog-instagram-figure-compact">
   <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/reel/DSkKIByDm8t/" data-instgrm-version="14"></blockquote>
   <figcaption>
     Reel do meetup em que Thiago participou.

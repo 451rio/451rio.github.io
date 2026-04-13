@@ -1264,6 +1264,11 @@ footer a {
   display: block;
 }
 
+.blog-person-figure-featured .blog-person-photo {
+  width: 150px;
+  height: 150px;
+}
+
 .blog-instagram-figure {
   margin: 1rem 0 1.2rem;
 }
@@ -1272,6 +1277,10 @@ footer a {
   margin: 0 auto 0.6rem !important;
   min-width: 0 !important;
   width: min(540px, 100%) !important;
+}
+
+.blog-instagram-figure-compact .instagram-media {
+  width: min(480px, 100%) !important;
 }
 
 .blog-instagram-figure figcaption {
