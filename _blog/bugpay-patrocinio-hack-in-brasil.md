@@ -20,10 +20,6 @@ profissionais.
   <img class="blog-person-photo" src="{{ '/assets/images/bugpay-cover.jpg' | relative_url }}" alt="Representantes da BUGPAY em evento de cibersegurança">
 </figure>
 
-<figure class="blog-sponsor-figure">
-  <img class="blog-sponsor-logo" src="{{ '/assets/images/sponsors/bugpay-logo.png' | relative_url }}" alt="Logo da BUGPAY">
-</figure>
-
 ## Comunidade como ponto de partida
 
 Segundo a BUGPAY, apoiar iniciativas comunitárias faz parte da própria
@@ -36,6 +32,10 @@ está alinhado com o principal valor da marca: a crença de que a
 segurança cibernética evolui de forma coletiva. Mais do que visibilidade
 institucional, a parceria é vista como uma forma de participar de um
 ecossistema que impulsiona conhecimento e crescimento mútuo.
+
+<figure class="blog-sponsor-figure">
+  <img class="blog-sponsor-logo" src="{{ '/assets/images/sponsors/bugpay-logo.png' | relative_url }}" alt="Logo da BUGPAY">
+</figure>
 
 ## Branding, visibilidade e presença no público técnico
 

@@ -1287,8 +1287,9 @@ footer a {
 }
 
 .blog-person-figure-cover .blog-person-photo {
-  width: min(280px, 100%);
+  width: min(380px, 100%);
   height: auto;
+  margin: 0 auto;
 }
 
 .blog-instagram-figure {
