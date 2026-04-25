@@ -211,7 +211,7 @@ async function markEmailAsSent(env, jobId, resendEmailId) {
 async function markEmailAsRetry(env, jobId, errorText) {
   await env.DB
     .prepare(
-      "UPDATE email_jobs SET status = 'pending', send_after = datetime('now', '+24 hours'), updated_at = CURRENT_TIMESTAMP, last_error = ? WHERE id = ?"
+      "UPDATE email_jobs SET status = 'pending', send_after = datetime('now', '+10 minutes'), updated_at = CURRENT_TIMESTAMP, last_error = ? WHERE id = ?"
     )
     .bind(errorText, jobId)
     .run();
