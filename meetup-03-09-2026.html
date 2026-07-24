@@ -164,6 +164,20 @@ permalink: /meetup-03-09-2026/
     </div>
   </section>
 
+  {% assign edition_supporters = site.supporters | where_exp: "s", "s.meetups contains 'meetup-03-09-2026'" | sort: "order" %}
+  {% if edition_supporters != empty %}
+  <section class="meetup-card">
+    <h2>Apoio</h2>
+    <div class="sponsor-list">
+      {% for supporter in edition_supporters %}
+        <a class="sponsor-card sponsor-link" href="{{ supporter.url | relative_url }}" aria-label="Ver {{ supporter.name }}">
+          <img src="{{ supporter.logo | replace: ' ', '%20' | relative_url }}" alt="Logo {{ supporter.name }}">
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   <section class="meetup-card">
     <h2>Local do Meetup</h2>
     <p><strong>Endereço completo:</strong> FIAP — Rua Marques de Olinda, 11</p>
