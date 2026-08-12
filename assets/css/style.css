@@ -1183,8 +1183,158 @@ footer a {
 
 #registrationFeedbackModal.is-success .registration-feedback-title,
 #sponsorFeedbackModal.is-success .registration-feedback-title,
-#talkFeedbackModal.is-success .registration-feedback-title {
+#talkFeedbackModal.is-success .registration-feedback-title,
+#subscriptionFeedbackModal.is-success .registration-feedback-title {
   color: #2fc3a2;
+}
+
+.btn:focus-visible,
+.modal-close:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+
+.btn-danger {
+  background: rgba(255, 143, 143, 0.14);
+  border: 1px solid rgba(255, 143, 143, 0.45);
+  color: #ff9f9f;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(255, 143, 143, 0.22);
+  border-color: rgba(255, 143, 143, 0.75);
+  color: #ffc4c4;
+  transform: translateY(-1px);
+}
+
+.account-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.account-bar h2 {
+  margin-bottom: 0.25rem;
+}
+
+.account-email {
+  color: var(--accent-soft);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.subscription-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.subscription-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  background: rgba(11, 20, 26, 0.55);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.subscription-card-main {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.subscription-card-main h3 {
+  font-size: 1.05rem;
+  margin: 0.45rem 0 0.35rem;
+}
+
+.subscription-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: .03em;
+}
+
+.subscription-badge.is-upcoming {
+  border-color: rgba(47, 195, 162, 0.45);
+  background: rgba(47, 195, 162, 0.14);
+  color: #7de0ca;
+}
+
+.subscription-badge.is-past {
+  color: var(--text-muted);
+}
+
+.subscription-meta {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.subscription-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.subscription-note {
+  color: #7f8a92;
+  font-size: 0.78rem;
+  max-width: 220px;
+}
+
+.subscription-empty {
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.cancel-form {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.cancel-form-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.cancel-form-label strong {
+  color: #ff9f9f;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: .05em;
+}
+
+.cancel-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+.subscriptions-hint {
+  margin-top: 0.9rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.subscriptions-hint a {
+  color: var(--accent-soft);
+  text-decoration: underline;
+}
+
+.subscriptions-hint a:hover {
+  color: var(--accent);
 }
 
 .registration-textarea {

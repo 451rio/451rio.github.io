@@ -5,9 +5,25 @@ function json(data, status = 200, corsOrigin = "*") {
       "content-type": "application/json; charset=utf-8",
       "access-control-allow-origin": corsOrigin,
       "access-control-allow-methods": "GET,POST,OPTIONS",
-      "access-control-allow-headers": "content-type,authorization"
+      "access-control-allow-headers": "content-type,authorization",
+      // Responses carry personal data and are origin-dependent: never let a
+      // browser or intermediary keep or share a copy.
+      "cache-control": "no-store",
+      vary: "Origin"
     }
   });
+}
+
+// Work that must not delay (or leak its duration into) the response. Sending
+// an e-mail only when an account exists is exactly the kind of timing
+// difference that turns a deliberately generic answer into an oracle.
+function runInBackground(ctx, task) {
+  const promise = Promise.resolve()
+    .then(task)
+    .catch((error) => console.error("[background]", error));
+
+  if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(promise);
+  return promise;
 }
 
 function serverError(corsOrigin, context, error) {
@@ -34,11 +50,20 @@ async function readJsonBody(request, corsOrigin) {
     return {error: json({error: "Payload muito grande"}, 413, corsOrigin)};
   }
 
+  let parsed;
   try {
-    return {body: JSON.parse(raw)};
+    parsed = JSON.parse(raw);
   } catch {
     return {error: json({error: "Invalid JSON body"}, 400, corsOrigin)};
   }
+
+  // `null`, arrays and scalars are valid JSON but every handler reads fields
+  // off this value — without the guard they throw and surface as a 500.
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {error: json({error: "Invalid JSON body"}, 400, corsOrigin)};
+  }
+
+  return {body: parsed};
 }
 
 function getCorsOrigin(request, env) {
@@ -56,7 +81,9 @@ function getCorsOrigin(request, env) {
 function isValidEmail(email) {
   if (typeof email !== "string") return false;
   if (email.length < 6 || email.length > 254) return false;
-  if (email.includes(" ")) return false;
+  // Espaço era o único caractere barrado, então "a\n@b.com" passava. Controle e
+  // CR/LF são o que transforma um endereço em injeção de cabeçalho mais adiante.
+  if (/[\s\u0000-\u001F\u007F]/.test(email)) return false;
 
   const atIndex = email.indexOf("@");
   if (atIndex <= 0) return false;
@@ -131,8 +158,14 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+// Erros do provedor de e-mail costumam ecoar o endereço que falhou, e esse texto
+// vai parar em email_jobs.last_error, que nunca é purgado.
+function redactEmails(text) {
+  return text.replace(/[^\s@,;:<>"']+@[^\s@,;:<>"']+\.[^\s@,;:<>"']+/g, "[e-mail removido]");
+}
+
 function truncateError(value, maxLength = 500) {
-  const text = String(value || "");
+  const text = redactEmails(String(value || ""));
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength);
 }
@@ -216,6 +249,41 @@ async function blindIndex(label, value, env) {
   return bytesToBase64(new Uint8Array(signature));
 }
 
+function generateOpaqueToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return bytesToBase64(bytes)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function isOpaqueToken(value) {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{32,128}$/.test(value);
+}
+
+async function hashToken(token) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return bytesToBase64(new Uint8Array(digest));
+}
+
+function getSiteBaseUrl(env) {
+  const configured = String(env.SITE_BASE_URL || "").trim().replace(/\/+$/, "");
+  if (configured) return configured;
+
+  const firstAllowedOrigin = String(env.ALLOWED_ORIGIN || "")
+    .split(",")[0]
+    .trim()
+    .replace(/\/+$/, "");
+
+  return firstAllowedOrigin || "https://hackinbrasil.com.br";
+}
+
+function isEventPast(eventDate) {
+  const time = Date.parse(String(eventDate || ""));
+  if (!Number.isFinite(time)) return false;
+  return Date.now() > time;
+}
+
 const DISPOSABLE_EMAIL_DOMAINS = new Set([
   "mailinator.com",
   "guerrillamail.com",
@@ -296,7 +364,7 @@ async function sendEmailWithResend(env, job) {
 
   const body = {
     from: env.RESEND_FROM_EMAIL,
-    to: [job.recipient_email],
+    to: [sanitizeHeaderValue(job.recipient_email)],
     subject: sanitizeHeaderValue(job.subject),
     html: job.html_body,
     text: job.text_body
@@ -486,6 +554,427 @@ async function consumeCaptcha(env, id, answer) {
     .first();
 
   return !!row && Number(row.answer) === answer;
+}
+
+const MAGIC_LINK_TTL_MINUTES = 15;
+const MAGIC_LINK_WINDOW_MINUTES = 15;
+const MAGIC_LINK_MAX_PER_WINDOW = 3;
+const SESSION_TTL_MINUTES = 30;
+const CANCEL_CONFIRMATION_WORD = "CANCELAR";
+
+const GENERIC_MAGIC_LINK_MESSAGE =
+  "Se houver inscrições vinculadas a este e-mail, enviamos um link de acesso. O link vale por 15 minutos e só pode ser usado uma vez.";
+
+function normalizeConfirmation(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+}
+
+function formatMeetupDate(eventDate) {
+  const time = Date.parse(String(eventDate || ""));
+  if (!Number.isFinite(time)) return String(eventDate || "");
+  return new Date(time).toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+
+function buildMagicLinkEmail(link) {
+  const safeLink = escapeHtml(link);
+
+  const subject = "Acesso às suas inscrições — Hack in Brasil";
+
+  const textBody = [
+    "Olá,",
+    "",
+    "Recebemos um pedido de acesso à área de inscrições do Hack in Brasil.",
+    "Abra o link abaixo para ver e gerenciar suas inscrições:",
+    "",
+    link,
+    "",
+    `O link expira em ${MAGIC_LINK_TTL_MINUTES} minutos e só pode ser usado uma vez.`,
+    "Se não foi você quem pediu, ignore este e-mail: nenhuma ação será tomada.",
+    "",
+    "Abraços,",
+    "Equipe Hack in Brasil"
+  ].join("\n");
+
+  const htmlBody =
+    "<p>Olá,</p>" +
+    "<p>Recebemos um pedido de acesso à área de inscrições do Hack in Brasil.</p>" +
+    `<p><a href="${safeLink}">Ver e gerenciar minhas inscrições</a></p>` +
+    `<p style="color:#666;font-size:13px;word-break:break-all;">Se o botão não funcionar, copie este endereço no navegador:<br>${safeLink}</p>` +
+    `<p>O link expira em ${MAGIC_LINK_TTL_MINUTES} minutos e só pode ser usado uma vez.</p>` +
+    "<p>Se não foi você quem pediu, ignore este e-mail: nenhuma ação será tomada.</p>" +
+    "<p>Abraços,<br>Equipe Hack in Brasil</p>";
+
+  return {subject, textBody, htmlBody};
+}
+
+function buildCancellationEmail(meetupTitle, eventDate) {
+  const formattedDate = formatMeetupDate(eventDate);
+  const subject = `Inscrição cancelada — ${meetupTitle}`;
+
+  const textBody = [
+    "Olá,",
+    "",
+    `Sua inscrição no meetup "${meetupTitle}" (${formattedDate}) foi cancelada e a vaga foi liberada.`,
+    "",
+    "Se o cancelamento não foi feito por você, escreva para contato@hackinbrasil.com.br.",
+    "Você pode se inscrever novamente enquanto houver vagas abertas.",
+    "",
+    "Abraços,",
+    "Equipe Hack in Brasil"
+  ].join("\n");
+
+  const htmlBody =
+    "<p>Olá,</p>" +
+    `<p>Sua inscrição no meetup <strong>${escapeHtml(meetupTitle)}</strong> (${escapeHtml(
+      formattedDate
+    )}) foi cancelada e a vaga foi liberada.</p>` +
+    "<p>Se o cancelamento não foi feito por você, escreva para contato@hackinbrasil.com.br.</p>" +
+    "<p>Você pode se inscrever novamente enquanto houver vagas abertas.</p>" +
+    "<p>Abraços,<br>Equipe Hack in Brasil</p>";
+
+  return {subject, textBody, htmlBody};
+}
+
+async function handleMagicLinkRequest(request, env, corsOrigin, ctx) {
+  const parsed = await readJsonBody(request, corsOrigin);
+  if (parsed.error) return parsed.error;
+  const body = parsed.body;
+
+  const email = String(body.email || "").trim().toLowerCase();
+  const captchaId = String(body.captchaId || "");
+  const captchaValue = Number(body.captcha);
+
+  if (!isValidEmail(email)) {
+    return json({error: "E-mail inválido"}, 400, corsOrigin);
+  }
+  if (!captchaId || !Number.isFinite(captchaValue)) {
+    return json({error: "Verificação obrigatória"}, 400, corsOrigin);
+  }
+  if (!(await consumeCaptcha(env, captchaId, captchaValue))) {
+    return json({error: "Verificação inválida ou expirada. Tente novamente."}, 400, corsOrigin);
+  }
+
+  let emailHash;
+  try {
+    emailHash = await blindIndex("login", email, env);
+  } catch (err) {
+    return serverError(corsOrigin, "auth:blindIndex", err);
+  }
+
+  try {
+    const recentRequests = await env.DB
+      .prepare(
+        "SELECT COUNT(*) AS total FROM auth_login_requests WHERE email_hash = ? AND created_at > datetime('now', ?)"
+      )
+      .bind(emailHash, `-${MAGIC_LINK_WINDOW_MINUTES} minutes`)
+      .first();
+
+    if (Number(recentRequests?.total || 0) >= MAGIC_LINK_MAX_PER_WINDOW) {
+      return json(
+        {
+          error: `Muitas solicitações de acesso. Aguarde ${MAGIC_LINK_WINDOW_MINUTES} minutos e tente novamente.`
+        },
+        429,
+        corsOrigin
+      );
+    }
+
+    const registrationCount = await env.DB
+      .prepare("SELECT COUNT(*) AS total FROM registrations WHERE email = ?")
+      .bind(email)
+      .first();
+
+    if (Number(registrationCount?.total || 0) === 0) {
+      await env.DB
+        .prepare("INSERT INTO auth_login_requests (email_hash) VALUES (?)")
+        .bind(emailHash)
+        .run();
+      return json({ok: true, message: GENERIC_MAGIC_LINK_MESSAGE}, 200, corsOrigin);
+    }
+
+    const token = generateOpaqueToken();
+    const tokenHash = await hashToken(token);
+
+    await env.DB
+      .prepare(
+        "INSERT INTO auth_login_requests (email_hash, email, token_hash, expires_at) VALUES (?, ?, ?, datetime('now', ?))"
+      )
+      .bind(emailHash, email, tokenHash, `+${MAGIC_LINK_TTL_MINUTES} minutes`)
+      .run();
+
+    const link = `${getSiteBaseUrl(env)}/minhas-inscricoes/?token=${encodeURIComponent(token)}`;
+    const message = buildMagicLinkEmail(link);
+
+    // Deliberately not awaited: the caller must not be able to tell the two
+    // branches apart by how long the answer took.
+    runInBackground(ctx, () =>
+      sendEmailWithResend(env, {
+        recipient_email: email,
+        subject: message.subject,
+        html_body: message.htmlBody,
+        text_body: message.textBody
+      })
+    );
+  } catch (err) {
+    return serverError(corsOrigin, "auth:magicLink", err);
+  }
+
+  return json({ok: true, message: GENERIC_MAGIC_LINK_MESSAGE}, 200, corsOrigin);
+}
+
+async function handleSessionCreate(request, env, corsOrigin) {
+  const parsed = await readJsonBody(request, corsOrigin);
+  if (parsed.error) return parsed.error;
+
+  const token = String(parsed.body.token || "").trim();
+  const invalidTokenResponse = json(
+    {error: "Link de acesso inválido ou expirado. Solicite um novo."},
+    401,
+    corsOrigin
+  );
+
+  if (!isOpaqueToken(token)) return invalidTokenResponse;
+
+  try {
+    const tokenHash = await hashToken(token);
+
+    const consumed = await env.DB
+      .prepare(
+        "UPDATE auth_login_requests SET consumed = 1 WHERE token_hash = ? AND consumed = 0 AND expires_at > CURRENT_TIMESTAMP"
+      )
+      .bind(tokenHash)
+      .run();
+
+    if (!consumed.meta || consumed.meta.changes !== 1) return invalidTokenResponse;
+
+    const loginRequest = await env.DB
+      .prepare("SELECT email FROM auth_login_requests WHERE token_hash = ?")
+      .bind(tokenHash)
+      .first();
+
+    if (!loginRequest?.email) return invalidTokenResponse;
+
+    const sessionToken = generateOpaqueToken();
+    const sessionHash = await hashToken(sessionToken);
+
+    await env.DB
+      .prepare(
+        "INSERT INTO auth_sessions (email, token_hash, expires_at) VALUES (?, ?, datetime('now', ?))"
+      )
+      .bind(loginRequest.email, sessionHash, `+${SESSION_TTL_MINUTES} minutes`)
+      .run();
+
+    return json(
+      {
+        ok: true,
+        token: sessionToken,
+        email: loginRequest.email,
+        expiresInMinutes: SESSION_TTL_MINUTES
+      },
+      200,
+      corsOrigin
+    );
+  } catch (err) {
+    return serverError(corsOrigin, "auth:session", err);
+  }
+}
+
+function getBearerToken(request) {
+  const header = request.headers.get("Authorization") || "";
+  const match = header.match(/^Bearer\s+(\S+)$/i);
+  if (!match) return null;
+  return isOpaqueToken(match[1]) ? match[1] : null;
+}
+
+async function getSession(request, env) {
+  const token = getBearerToken(request);
+  if (!token) return null;
+
+  const tokenHash = await hashToken(token);
+  const session = await env.DB
+    .prepare(
+      "SELECT id, email FROM auth_sessions WHERE token_hash = ? AND revoked = 0 AND expires_at > CURRENT_TIMESTAMP"
+    )
+    .bind(tokenHash)
+    .first();
+
+  return session || null;
+}
+
+async function withSession(request, env, corsOrigin, handler) {
+  let session;
+  try {
+    session = await getSession(request, env);
+  } catch (err) {
+    return serverError(corsOrigin, "auth:getSession", err);
+  }
+
+  if (!session) {
+    return json(
+      {error: "Sessão expirada ou inválida. Solicite um novo link de acesso."},
+      401,
+      corsOrigin
+    );
+  }
+
+  return handler(session);
+}
+
+async function handleMyRegistrations(env, session, corsOrigin) {
+  let rows;
+  try {
+    rows = await env.DB
+      .prepare(
+        "SELECT r.meetup_slug, r.name, r.created_at, m.title, m.event_date FROM registrations r JOIN meetups m ON m.slug = r.meetup_slug WHERE r.email = ? ORDER BY m.event_date DESC"
+      )
+      .bind(session.email)
+      .all();
+  } catch (err) {
+    return serverError(corsOrigin, "me:registrations", err);
+  }
+
+  const registrations = (Array.isArray(rows.results) ? rows.results : []).map((row) => {
+    const past = isEventPast(row.event_date);
+    return {
+      meetupSlug: row.meetup_slug,
+      title: row.title,
+      eventDate: row.event_date,
+      name: row.name,
+      registeredAt: row.created_at,
+      isPast: past,
+      canCancel: !past
+    };
+  });
+
+  // What the person came here to act on goes first: upcoming meetups with the
+  // nearest one on top, then past editions most recent first.
+  registrations.sort((a, b) => {
+    if (a.isPast !== b.isPast) return a.isPast ? 1 : -1;
+    const aTime = Date.parse(a.eventDate) || 0;
+    const bTime = Date.parse(b.eventDate) || 0;
+    return a.isPast ? bTime - aTime : aTime - bTime;
+  });
+
+  return json(
+    {
+      email: session.email,
+      confirmationWord: CANCEL_CONFIRMATION_WORD,
+      registrations
+    },
+    200,
+    corsOrigin
+  );
+}
+
+async function handleCancelRegistration(request, env, session, slug, corsOrigin, ctx) {
+  const parsed = await readJsonBody(request, corsOrigin);
+  if (parsed.error) return parsed.error;
+
+  if (normalizeConfirmation(parsed.body.confirmation) !== CANCEL_CONFIRMATION_WORD) {
+    return json(
+      {error: `Digite ${CANCEL_CONFIRMATION_WORD} para confirmar o cancelamento.`},
+      400,
+      corsOrigin
+    );
+  }
+
+  try {
+    const registration = await env.DB
+      .prepare("SELECT id FROM registrations WHERE meetup_slug = ? AND email = ?")
+      .bind(slug, session.email)
+      .first();
+
+    if (!registration) {
+      return json({error: "Inscrição não encontrada"}, 404, corsOrigin);
+    }
+
+    const meetup = await getMeetupBySlug(env.DB, slug);
+    if (!meetup) {
+      return json({error: "Meetup not found"}, 404, corsOrigin);
+    }
+    if (isEventPast(meetup.event_date)) {
+      return json(
+        {error: "Este meetup já aconteceu, então a inscrição não pode mais ser cancelada."},
+        409,
+        corsOrigin
+      );
+    }
+
+    // One batch, one transaction. The seat count is recomputed from the
+    // registrations table instead of being decremented: that is idempotent, so
+    // a double submit can never give two seats back, and it repairs any drift
+    // the counter may already carry. Do not gate this on `meta.changes` — D1
+    // counts cascaded deletes there too (an `email_jobs` row cascades from the
+    // registration), so the value is not a reliable "did I delete one row".
+    await env.DB.batch([
+      env.DB
+        .prepare("DELETE FROM email_jobs WHERE registration_id = ? AND status IN ('pending', 'processing')")
+        .bind(registration.id),
+      env.DB
+        .prepare("DELETE FROM registrations WHERE id = ? AND meetup_slug = ? AND email = ?")
+        .bind(registration.id, slug, session.email),
+      env.DB
+        .prepare(
+          "UPDATE meetups SET registrations_count = (SELECT COUNT(*) FROM registrations WHERE meetup_slug = ?), updated_at = CURRENT_TIMESTAMP WHERE slug = ?"
+        )
+        .bind(slug, slug),
+      env.DB
+        .prepare("INSERT INTO registration_cancellations (meetup_slug) VALUES (?)")
+        .bind(slug)
+    ]);
+
+    // The seat is already free at this point, so the confirmation e-mail must
+    // not keep the person waiting on a third-party round-trip.
+    const notice = buildCancellationEmail(String(meetup.title), meetup.event_date);
+    runInBackground(ctx, () =>
+      sendEmailWithResend(env, {
+        recipient_email: session.email,
+        subject: notice.subject,
+        html_body: notice.htmlBody,
+        text_body: notice.textBody
+      })
+    );
+
+    return json(
+      {ok: true, message: "Inscrição cancelada. A vaga foi liberada para outra pessoa."},
+      200,
+      corsOrigin
+    );
+  } catch (err) {
+    return serverError(corsOrigin, "me:cancel", err);
+  }
+}
+
+async function handleLogout(env, session, corsOrigin) {
+  try {
+    await env.DB
+      .prepare("UPDATE auth_sessions SET revoked = 1 WHERE id = ?")
+      .bind(session.id)
+      .run();
+  } catch (err) {
+    return serverError(corsOrigin, "auth:logout", err);
+  }
+
+  return json({ok: true}, 200, corsOrigin);
+}
+
+async function purgeExpiredAuthRecords(env) {
+  await env.DB
+    .prepare("DELETE FROM auth_login_requests WHERE created_at < datetime('now', '-1 day')")
+    .run();
+
+  await env.DB
+    .prepare("DELETE FROM auth_sessions WHERE expires_at < datetime('now', '-1 day') OR (revoked = 1 AND created_at < datetime('now', '-1 day'))")
+    .run();
 }
 
 async function handleStatus(env, slug, corsOrigin) {
@@ -957,7 +1446,7 @@ async function handleTalkSubmit(request, env, corsOrigin) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const corsOrigin = getCorsOrigin(request, env);
 
     try {
@@ -969,7 +1458,13 @@ export default {
           headers: {
             "access-control-allow-origin": corsOrigin,
             "access-control-allow-methods": "GET,POST,OPTIONS",
-            "access-control-allow-headers": "content-type,authorization"
+            "access-control-allow-headers": "content-type,authorization",
+            // This answer is origin-specific: without Vary an intermediary
+            // cache could hand one origin's allow-origin header to another.
+            // Preflights carry no personal data, so they may be cached — an
+            // hour of it saves a round-trip before every POST.
+            vary: "Origin",
+            "access-control-max-age": "3600"
           }
         });
       }
@@ -996,6 +1491,33 @@ export default {
         return handleTalkSubmit(request, env, corsOrigin);
       }
 
+      if (request.method === "POST" && url.pathname === "/api/auth/magic-link") {
+        return handleMagicLinkRequest(request, env, corsOrigin, ctx);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/auth/session") {
+        return handleSessionCreate(request, env, corsOrigin);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/auth/logout") {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleLogout(env, session, corsOrigin)
+        );
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/me/registrations") {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleMyRegistrations(env, session, corsOrigin)
+        );
+      }
+
+      const cancelMatch = url.pathname.match(/^\/api\/me\/registrations\/([a-z0-9-]+)\/cancel$/);
+      if (request.method === "POST" && cancelMatch) {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleCancelRegistration(request, env, session, cancelMatch[1], corsOrigin, ctx)
+        );
+      }
+
       return json({error: "Not found"}, 404, corsOrigin);
     } catch (err) {
       return serverError(corsOrigin, "fetch", err);
@@ -1010,6 +1532,10 @@ export default {
           await env.DB
             .prepare("DELETE FROM captcha_challenges WHERE expires_at < CURRENT_TIMESTAMP")
             .run();
+        } catch {
+        }
+        try {
+          await purgeExpiredAuthRecords(env);
         } catch {
         }
       })()

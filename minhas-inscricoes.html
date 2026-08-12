@@ -1,0 +1,101 @@
+---
+layout: default
+title: Minhas inscrições | Hack in Brasil
+permalink: /minhas-inscricoes/
+# This page is opened with ?token=... in the URL. Never hand that token to a
+# third party through the Referer header (the layout loads webfonts).
+referrer_policy: no-referrer
+sitemap: false
+---
+<header class="nav">
+  <div class="nav-left">
+    <a class="nav-brand" href="{{ '/' | relative_url }}">
+      <img class="nav-logo" src="{{ '/assets/images/hackinbrasil.png' | relative_url }}" alt="Logo Hack in Brasil">
+      <span>Hack in Brasil</span>
+    </a>
+    <span class="nav-logo-tag">Inscrições</span>
+  </div>
+  <nav class="nav-right nav-right-static">
+    <a class="nav-link" href="{{ '/' | relative_url }}">Voltar para início</a>
+  </nav>
+</header>
+
+<main class="meetup-page" id="subscriptions-page" data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev">
+  <section class="meetup-card">
+    <p class="hero-kicker">Área de participante</p>
+    <h1 class="meetup-title">Minhas inscrições</h1>
+    <p class="meetup-subtitle">
+      Veja os meetups em que você está inscrito e cancele sua vaga se não puder comparecer — assim
+      outra pessoa da comunidade pode ocupá-la. O acesso é feito por um link enviado para o seu
+      e-mail, sem senha.
+    </p>
+  </section>
+
+  <section class="meetup-card" id="loading-section">
+    <p class="meetup-subtitle" id="loading-status" role="status" aria-live="polite">Carregando...</p>
+    <button class="btn btn-ghost" type="button" id="retry-button" hidden>Tentar novamente</button>
+  </section>
+
+  <section class="meetup-card" id="login-section" hidden>
+    <h2>Entrar sem senha</h2>
+    <p class="meetup-subtitle" id="login-status" role="status" aria-live="polite">
+      Informe o e-mail usado na inscrição. Enviaremos um link de acesso válido por 15 minutos.
+    </p>
+    <form id="magic-link-form" class="registration-form">
+      <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
+      <div class="registration-field registration-field-full">
+        <label for="login-email">E-mail</label>
+        <input id="login-email" class="registration-input" type="email" name="email" placeholder="exemplo@dominio.com" autocomplete="email" required>
+        <small class="registration-help">Use o mesmo e-mail informado na inscrição do meetup.</small>
+      </div>
+      <div class="registration-field registration-field-full">
+        <label for="login-captcha">Verificação: quanto é <span id="login-captcha-question"></span>?</label>
+        <input id="login-captcha" class="registration-input" type="text" name="captcha" inputmode="numeric" autocomplete="off" placeholder="Resultado" required>
+        <small class="registration-help">Resolva a operação para confirmar que você não é um robô.</small>
+      </div>
+      <div class="registration-actions">
+        <button class="btn btn-primary" type="submit" id="magic-link-submit">Receber link de acesso</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="meetup-card" id="subscriptions-section" hidden>
+    <div class="account-bar">
+      <div>
+        <h2>Suas inscrições</h2>
+        <p class="account-email" id="account-email"></p>
+      </div>
+      <button class="btn btn-ghost" type="button" id="logout-button">Sair</button>
+    </div>
+    <div class="subscription-list" id="subscription-list" role="region" aria-live="polite" aria-label="Lista de inscrições"></div>
+  </section>
+</main>
+
+<div class="modal" id="cancelModal" aria-hidden="true">
+  <div class="modal-content modal-content--feedback">
+    <button class="modal-close" data-close aria-label="Fechar">✕</button>
+    <h3 id="cancel-modal-title" class="registration-feedback-title">Cancelar inscrição</h3>
+    <p id="cancel-modal-message" class="registration-feedback-message"></p>
+    <form id="cancel-form" class="cancel-form">
+      <label class="cancel-form-label" for="cancel-confirmation">
+        Para confirmar, digite <strong id="cancel-confirmation-word">CANCELAR</strong> no campo abaixo.
+      </label>
+      <input id="cancel-confirmation" class="registration-input" type="text" placeholder="CANCELAR" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" required>
+      <div class="cancel-form-actions">
+        <button class="btn btn-ghost" type="button" data-close>Manter inscrição</button>
+        <button class="btn btn-danger" type="submit" id="cancel-submit" disabled>Cancelar inscrição</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="subscriptionFeedbackModal" aria-hidden="true">
+  <div class="modal-content modal-content--feedback">
+    <button class="modal-close" data-close aria-label="Fechar">✕</button>
+    <h3 id="subscription-feedback-title" class="registration-feedback-title"></h3>
+    <p id="subscription-feedback-message" class="registration-feedback-message"></p>
+  </div>
+</div>
+
+<script src="{{ '/assets/js/form-utils.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/meetup-subscriptions.js' | relative_url }}"></script>

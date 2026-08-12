@@ -36,3 +36,6 @@ defaults:
 
 exclude:
   - README.md
+  # Internal architecture/ops notes. They were being published at /docs/,
+  # handing out the operational detail of the registration backend.
+  - docs
