@@ -1,18 +1,8 @@
 ---
 layout: default
 ---
-<header class="nav">
-  <div class="nav-left">
-    <a class="nav-brand" href="{{ '/' | relative_url }}">
-      <img class="nav-logo" src="{{ '/assets/images/hackinbrasil.png' | relative_url }}" alt="Logo Hack in Brasil">
-      <span>Hack in Brasil</span>
-    </a>
-    <span class="nav-logo-tag">{{ page.entity_label | default: "Parceiro" }}</span>
-  </div>
-  <nav class="nav-right nav-right-static">
-    <a class="nav-link" href="{{ '/' | relative_url }}">Voltar para início</a>
-  </nav>
-</header>
+{%- assign nav_tag = page.entity_label | default: "Parceiro" -%}
+{% include nav.html tag=nav_tag back_url="/" back_label="Voltar para início" %}
 
 <main class="meetup-page">
   <section class="meetup-card">

@@ -10,6 +10,15 @@ Também agenda e envia e-mails de confirmação com atraso de 10 minutos.
 - `POST /api/meetups/:slug/register`
 - `POST /api/sponsors` — solicitações de patrocínio (substitui o formulário do Airtable)
 - `POST /api/talks` — propostas de palestra / Call for Papers (substitui o formulário do Airtable)
+- `POST /api/auth/magic-link` — envia o link de acesso sem senha
+- `POST /api/auth/session` — troca o link por uma sessão bearer
+- `POST /api/auth/logout` — revoga a sessão
+- `GET /api/me/registrations` — inscrições, perfil do ranking e estado do certificado
+- `POST /api/me/registrations/:slug/cancel` — cancela a inscrição
+- `POST /api/me/registrations/:slug/certificate` — emite o certificado de participação
+- `GET /api/certificates/:code` — consulta pública de um certificado
+- `POST /api/me/profile` — apelido e visibilidade no ranking
+- `GET /api/ranking` — ranking público (apelido + XP)
 
 ## Verificação (captcha) validada no servidor
 
@@ -44,6 +53,28 @@ Também agenda e envia e-mails de confirmação com atraso de 10 minutos.
 - `photoUrl` aceita apenas URLs `http`/`https`; consentimento de imagem e ciência das orientações são obrigatórios.
 - Frontend: página nativa `submeter-palestra.html` (`/submeter-palestra/`) + `assets/js/talk-submission.js`.
 - Migração da tabela: `migrations/0010_talk_proposals.sql`.
+
+## Certificado de participação (`0015`)
+
+- `meetups.duration_minutes` (padrão 240) define a carga horária impressa e o fim do evento.
+- O certificado só é emitido **24 horas após o fim** do meetup; antes disso a API responde
+  `409` com `availableAt`.
+- Cada emissão grava uma linha em `certificates` com um código público
+  (`HIB-XXXX-XXXX-XXXX`, ~60 bits). Emitir de novo devolve o mesmo código.
+- `participant_name` e `duration_minutes` são congelados na emissão: reimprimir não pode
+  gerar um documento diferente do que a pessoa já tem.
+- O PDF é gerado pelo navegador (impressão) a partir de `/certificado/?codigo=...`.
+  Não há gerador de PDF no Worker.
+
+## Ranking público (`0016`)
+
+- `meetups.xp_reward` (padrão 100) define quanto vale participar de cada meetup.
+- `participant_profiles` guarda apelido e o opt-in (`is_public`). O ranking devolve
+  **apenas apelido e XP**.
+- O XP é somado na hora da consulta, contando só meetups que já terminaram — inscrição em
+  meetup futuro não pontua.
+- Apelidos são únicos ignorando caixa e acento, e nomes que se passariam pela organização
+  (`admin`, `organizador`, `hackinbrasil`, ...) são recusados.
 
 ## Dados coletados
 

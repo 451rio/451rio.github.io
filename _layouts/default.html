@@ -10,6 +10,14 @@
   <link rel="preload" href="{{ '/assets/fonts/space-grotesk-variable-latin.woff2' | relative_url }}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" type="text/css" href="{{ '/assets/css/fonts.css' | relative_url }}">
   <link rel="stylesheet" type="text/css" href="{{ '/assets/css/style.css' | relative_url }}">
+  {%- comment -%}
+    Folhas extras por página. O certificado precisa de regras @page/@media print
+    que não podem viver no style.css compartilhado: elas mudariam a impressão de
+    todas as outras páginas do site.
+  {%- endcomment -%}
+  {%- for extra in page.extra_css %}
+  <link rel="stylesheet" type="text/css" href="{{ extra | relative_url }}">
+  {%- endfor %}
 </head>
 <body>
   {{ content }}

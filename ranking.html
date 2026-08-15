@@ -1,0 +1,30 @@
+---
+layout: default
+title: Ranking da comunidade | Hack in Brasil
+permalink: /ranking/
+description: Ranking público da comunidade Hack in Brasil — XP acumulado a cada meetup.
+---
+{% include nav.html tag="Ranking" back_url="/" back_label="Voltar para início" %}
+
+<main class="meetup-page" id="ranking-page" data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev">
+  <section class="meetup-card">
+    <p class="hero-kicker">Comunidade</p>
+    <h1 class="meetup-title">Ranking da comunidade</h1>
+    <p class="meetup-subtitle">
+      Cada meetup que você participa vale XP. A lista mostra apenas apelido e XP — sem nome,
+      sem e-mail, sem em quais meetups cada pessoa esteve.
+    </p>
+    <p class="subscriptions-hint">
+      Aparecer aqui é opcional: escolha um apelido e ative o perfil público em
+      <a href="{{ '/minhas-inscricoes/' | relative_url }}">Minha conta</a>.
+    </p>
+  </section>
+
+  <section class="meetup-card">
+    <p class="meetup-subtitle" id="ranking-status" role="status" aria-live="polite">Carregando ranking...</p>
+    <button class="btn btn-ghost" type="button" id="ranking-retry" hidden>Tentar novamente</button>
+    <ol class="ranking-list" id="ranking-list" hidden></ol>
+  </section>
+</main>
+
+<script src="{{ '/assets/js/ranking.js' | relative_url }}"></script>

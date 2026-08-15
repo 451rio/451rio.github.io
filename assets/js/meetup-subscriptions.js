@@ -4,6 +4,7 @@
 
   const F = window.HIBForms;
   const apiBase = (page.dataset.apiBase || "").trim().replace(/\/$/, "");
+  const certificatePath = (page.dataset.certificateUrl || "/certificado/").trim();
 
   const loadingSection = document.getElementById("loading-section");
   const loadingStatus = document.getElementById("loading-status");
@@ -16,6 +17,13 @@
   const loginSubmit = document.getElementById("magic-link-submit");
   const captchaQuestion = document.getElementById("login-captcha-question");
   const captchaInput = document.getElementById("login-captcha");
+
+  const profileSection = document.getElementById("profile-section");
+  const profileSummary = document.getElementById("profile-summary");
+  const profileForm = document.getElementById("profile-form");
+  const profileNickname = document.getElementById("profile-nickname");
+  const profilePublic = document.getElementById("profile-public");
+  const profileSubmit = document.getElementById("profile-submit");
 
   const listSection = document.getElementById("subscriptions-section");
   const list = document.getElementById("subscription-list");
@@ -36,6 +44,7 @@
   const requiredNodes = [
     loadingSection, loadingStatus, retryButton,
     loginSection, loginStatus, loginForm, loginEmail, loginSubmit, captchaQuestion, captchaInput,
+    profileSection, profileSummary, profileForm, profileNickname, profilePublic, profileSubmit,
     listSection, list, accountEmail, logoutButton,
     cancelModal, cancelForm, cancelMessage, cancelInput, cancelSubmit, cancelWordLabel,
     feedbackModal, feedbackTitle, feedbackMessage
@@ -89,10 +98,52 @@
     });
   }
 
+  // Perto do limite das 24h, só a data faria a pessoa voltar aqui no escuro.
+  function formatEventDateTime(value) {
+    const time = Date.parse(String(value || ""));
+    if (!Number.isFinite(time)) return "";
+    return new Date(time).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  function certificateUrl(code) {
+    return `${certificatePath}?codigo=${encodeURIComponent(code)}`;
+  }
+
   function showOnly(section) {
     loadingSection.hidden = section !== loadingSection;
     loginSection.hidden = section !== loginSection;
     listSection.hidden = section !== listSection;
+    profileSection.hidden = section !== listSection;
+  }
+
+  function formatXp(xp) {
+    return `${Number(xp || 0).toLocaleString("pt-BR")} XP`;
+  }
+
+  function renderProfile(profile) {
+    const data = profile || {};
+    const xp = Number(data.xp || 0);
+    const meetups = Number(data.meetupsAttended || 0);
+
+    const earned = meetups === 1
+      ? `${formatXp(xp)} em 1 meetup`
+      : `${formatXp(xp)} em ${meetups} meetups`;
+
+    profileSummary.textContent = data.isPublic
+      ? `Você tem ${earned} e aparece no ranking como "${data.nickname}".`
+      : `Você tem ${earned}. Seu perfil está privado: ninguém vê você no ranking.`;
+
+    // Não sobrescreve o que a pessoa está digitando enquanto salva.
+    if (document.activeElement !== profileNickname) {
+      profileNickname.value = data.nickname || "";
+    }
+    profilePublic.checked = Boolean(data.isPublic);
   }
 
   function showLogin(message) {
@@ -151,6 +202,15 @@
     badge.textContent = registration.isPast ? "Já realizado" : "Inscrição confirmada";
     main.append(badge);
 
+    // Ao lado do status, e não solto no meio do card: os dois dizem o que
+    // aconteceu com aquela inscrição.
+    if (registration.xpEarned > 0) {
+      const xpBadge = document.createElement("span");
+      xpBadge.className = "subscription-badge is-xp";
+      xpBadge.textContent = `+${formatXp(registration.xpEarned)}`;
+      main.append(xpBadge);
+    }
+
     const title = document.createElement("h3");
     title.textContent = registration.title || registration.meetupSlug;
     main.append(title);
@@ -175,6 +235,8 @@
     const actions = document.createElement("div");
     actions.className = "subscription-actions";
 
+    const certificate = registration.certificate || {};
+
     if (registration.canCancel) {
       const cancelButton = document.createElement("button");
       cancelButton.type = "button";
@@ -184,15 +246,93 @@
         openCancelModal(registration);
       });
       actions.append(cancelButton);
+    } else if (certificate.code) {
+      // Já emitido: um link comum abre na hora e nenhum bloqueador de pop-up
+      // se mete no caminho.
+      const link = document.createElement("a");
+      link.className = "btn btn-primary";
+      link.href = certificateUrl(certificate.code);
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "Ver certificado";
+      actions.append(link);
+    } else if (certificate.available) {
+      const certificateButton = document.createElement("button");
+      certificateButton.type = "button";
+      certificateButton.className = "btn btn-primary";
+      certificateButton.textContent = "Gerar certificado";
+      certificateButton.addEventListener("click", function () {
+        issueCertificate(registration, certificateButton);
+      });
+      actions.append(certificateButton);
     } else {
       const note = document.createElement("p");
       note.className = "subscription-note";
-      note.textContent = "Evento encerrado — não é mais possível cancelar.";
+      note.textContent = certificate.availableAt
+        ? `Certificado disponível a partir de ${formatEventDateTime(certificate.availableAt)}.`
+        : "Evento encerrado — não é mais possível cancelar.";
       actions.append(note);
     }
 
     card.append(actions);
     return card;
+  }
+
+  async function issueCertificate(registration, button) {
+    // A aba precisa ser aberta dentro do clique: se ela esperar o POST, o
+    // navegador trata como pop-up e bloqueia.
+    const tab = window.open("", "_blank");
+    if (tab) tab.opener = null;
+
+    button.disabled = true;
+    button.textContent = "Gerando...";
+
+    let result;
+    try {
+      result = await apiFetch(
+        `/api/me/registrations/${encodeURIComponent(registration.meetupSlug)}/certificate`,
+        { method: "POST" }
+      );
+    } catch {
+      if (tab) tab.close();
+      button.disabled = false;
+      button.textContent = "Gerar certificado";
+      feedback.show("Erro de conexão. Tente novamente.", "error");
+      return;
+    }
+
+    const { response, data } = result;
+
+    if (response.status === 401) {
+      if (tab) tab.close();
+      setSessionToken("");
+      showLogin(SESSION_EXPIRED_MESSAGE);
+      return;
+    }
+
+    if (!response.ok || !data.certificate) {
+      if (tab) tab.close();
+      button.disabled = false;
+      button.textContent = "Gerar certificado";
+      feedback.show(data.error || "Não foi possível gerar o certificado.", "error");
+      await loadRegistrations();
+      return;
+    }
+
+    const url = certificateUrl(data.certificate.code);
+
+    if (tab) {
+      tab.location.replace(url);
+    } else {
+      // Pop-up bloqueado: a lista recarrega logo abaixo com o botão
+      // "Ver certificado", que é um link comum.
+      feedback.show(
+        "Certificado emitido. Use o botão \"Ver certificado\" no meetup para abri-lo.",
+        "success"
+      );
+    }
+
+    await loadRegistrations();
   }
 
   function renderList(registrations) {
@@ -235,6 +375,7 @@
     cancelInput.placeholder = confirmationWord;
 
     accountEmail.textContent = data.email || "";
+    renderProfile(data.profile);
     renderList(Array.isArray(data.registrations) ? data.registrations : []);
     showOnly(listSection);
   }
@@ -313,6 +454,53 @@
       "success"
     );
     await loadRegistrations();
+  });
+
+  profileForm.addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    const nickname = String(profileNickname.value || "").trim();
+    if (!nickname) {
+      feedback.show("Escolha um apelido para aparecer no ranking.", "error");
+      profileNickname.focus();
+      return;
+    }
+
+    profileSubmit.disabled = true;
+    profileSubmit.textContent = "Salvando...";
+
+    let result;
+    try {
+      result = await apiFetch("/api/me/profile", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ nickname, isPublic: profilePublic.checked })
+      });
+    } catch {
+      profileSubmit.disabled = false;
+      profileSubmit.textContent = "Salvar preferências";
+      feedback.show("Erro de conexão. Tente novamente.", "error");
+      return;
+    }
+
+    profileSubmit.disabled = false;
+    profileSubmit.textContent = "Salvar preferências";
+
+    const { response, data } = result;
+
+    if (response.status === 401) {
+      setSessionToken("");
+      showLogin(SESSION_EXPIRED_MESSAGE);
+      return;
+    }
+
+    if (!response.ok) {
+      feedback.show(data.error || "Não foi possível salvar suas preferências.", "error");
+      return;
+    }
+
+    renderProfile(data.profile);
+    feedback.show(data.message || "Preferências salvas.", "success");
   });
 
   logoutButton.addEventListener("click", async function () {

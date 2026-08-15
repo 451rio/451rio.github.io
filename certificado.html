@@ -1,0 +1,100 @@
+---
+layout: default
+title: Certificado de participação | Hack in Brasil
+permalink: /certificado/
+sitemap: false
+extra_css:
+  - /assets/css/certificate.css
+---
+{% include nav.html tag="Certificado" back_url="/" back_label="Voltar para início" %}
+
+<main class="certificate-page" id="certificate-page" data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev">
+  <section class="meetup-card" id="certificate-status-card">
+    <p class="hero-kicker">Certificado de participação</p>
+    <p class="meetup-subtitle" id="certificate-status" role="status" aria-live="polite">Carregando certificado...</p>
+
+    <form class="certificate-lookup" id="certificate-lookup-form" hidden>
+      <label class="certificate-lookup-label" for="certificate-code-input">
+        Código do certificado
+      </label>
+      <div class="certificate-lookup-row">
+        <input id="certificate-code-input" class="registration-input" type="text" name="codigo"
+               placeholder="HIB-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters"
+               autocorrect="off" spellcheck="false" required>
+        <button class="btn btn-primary" type="submit" id="certificate-lookup-submit">Ver certificado</button>
+      </div>
+      <small class="registration-help">
+        O código está impresso no rodapé de todo certificado emitido pelo Hack in Brasil.
+        Para gerar o seu, acesse <a href="{{ '/minhas-inscricoes/' | relative_url }}">Minhas inscrições</a>.
+      </small>
+    </form>
+  </section>
+
+  <div class="certificate-viewport" id="certificate-viewport" hidden>
+    <article class="certificate-sheet" id="certificate-sheet" aria-labelledby="certificate-title">
+      <div class="certificate-body">
+        <h1 class="certificate-title" id="certificate-title">Certificado de participação</h1>
+
+        <p class="certificate-paragraph">
+          O Hack in Brasil, iniciativa dedicada à promoção do conhecimento, ao desenvolvimento
+          técnico e ao fortalecimento da comunidade na área de segurança da informação, certifica que
+        </p>
+
+        <p class="certificate-name" id="certificate-name"></p>
+
+        <p class="certificate-paragraph" id="certificate-participation"></p>
+
+        <p class="certificate-paragraph">
+          Durante o evento, teve acesso a discussões relevantes, abordagens práticas e troca de
+          experiências entre profissionais da área, contribuindo para o aprimoramento de
+          conhecimentos, atualização técnica e ampliação da compreensão sobre o cenário atual
+          de segurança.
+        </p>
+
+        <p class="certificate-paragraph">
+          Sua participação contribuiu para o fortalecimento das interações, para a construção
+          coletiva do conhecimento e para o desenvolvimento contínuo da comunidade.
+        </p>
+
+        <p class="certificate-issued" id="certificate-issued"></p>
+
+        <p class="certificate-site">www.hackinbrasil.com.br</p>
+        <p class="certificate-code" id="certificate-code"></p>
+      </div>
+
+      <div class="certificate-signatures">
+        <div class="certificate-signature">
+          <span class="certificate-signature-name">Giovanni Martins</span>
+          <span class="certificate-signature-role">Comitê organizador</span>
+        </div>
+
+        <div class="certificate-seal">
+          {%- comment -%}
+            Versão do logo com fundo recortado: o arquivo original tem o fundo
+            preto embutido e viraria um quadrado escuro sobre a faixa clara.
+          {%- endcomment -%}
+          <img src="{{ '/assets/images/hackinbrasil-seal.png' | relative_url }}" alt="Hack in Brasil">
+        </div>
+
+        <div class="certificate-signature">
+          <span class="certificate-signature-name">Heitor Gouvêa</span>
+          <span class="certificate-signature-role">Comitê organizador</span>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <section class="meetup-card certificate-actions" id="certificate-actions" hidden>
+    <div class="certificate-actions-row">
+      <button class="btn btn-primary" type="button" id="certificate-print">Baixar em PDF</button>
+      <a class="btn btn-ghost" href="{{ '/minhas-inscricoes/' | relative_url }}">Voltar para minhas inscrições</a>
+    </div>
+    <p class="meetup-subtitle certificate-hint">
+      O download abre a janela de impressão do navegador — escolha <strong>Salvar como PDF</strong>,
+      orientação paisagem, para guardar o arquivo. Este certificado pode ser conferido por
+      qualquer pessoa em <span class="certificate-hint-url" id="certificate-share-url"></span>.
+    </p>
+  </section>
+</main>
+
+<script src="{{ '/assets/js/certificate.js' | relative_url }}"></script>

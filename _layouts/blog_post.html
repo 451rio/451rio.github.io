@@ -1,18 +1,7 @@
 ---
 layout: default
 ---
-<header class="nav">
-  <div class="nav-left">
-    <a class="nav-brand" href="{{ '/' | relative_url }}">
-      <img class="nav-logo" src="{{ '/assets/images/hackinbrasil.png' | relative_url }}" alt="Logo Hack in Brasil">
-      <span>Hack in Brasil</span>
-    </a>
-    <span class="nav-logo-tag">Artigo</span>
-  </div>
-  <nav class="nav-right nav-right-static">
-    <a class="nav-link" href="{{ '/blog/' | relative_url }}">Voltar para o blog</a>
-  </nav>
-</header>
+{% include nav.html tag="Artigo" back_url="/blog/" back_label="Voltar para o blog" %}
 
 <main class="blog-page">
   <article class="blog-article">

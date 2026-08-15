@@ -21,6 +21,15 @@
   box-sizing: border-box;
 }
 
+/* Regra de autor vence regra do navegador: qualquer `display` declarado aqui
+ * (.btn é inline-flex, .certificate-lookup é grid) passa por cima do
+ * `display: none` que o atributo `hidden` traz do user agent. Sem isto, os
+ * elementos que o JS esconde por `hidden` continuam na tela — era o caso do
+ * botão "Tentar novamente" na área de inscrições. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: 'Space Grotesk', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: radial-gradient(circle at top right, var(--bg-gradient-end), var(--bg-gradient-start));
@@ -103,6 +112,24 @@ a {
 
 .nav-link:hover::after {
   width: 100%;
+}
+
+.nav-link-account {
+  padding: .3rem .8rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: rgba(15, 26, 32, 0.9);
+  color: var(--accent);
+}
+
+/* O sublinhado animado do .nav-link ficaria solto por baixo da pílula. */
+.nav-link-account::after {
+  display: none;
+}
+
+.nav-link-account:hover {
+  border-color: var(--accent-soft);
+  color: var(--accent);
 }
 
 .nav-cta {
@@ -1337,6 +1364,77 @@ footer a {
   color: var(--accent);
 }
 
+.profile-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.subscription-badge.is-xp {
+  margin-left: 0.4rem;
+  border-color: rgba(244, 215, 77, 0.45);
+  background: rgba(244, 215, 77, 0.14);
+  color: var(--accent);
+}
+
+.ranking-list {
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.ranking-row {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr auto;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: rgba(11, 20, 26, 0.55);
+}
+
+.ranking-position {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.ranking-nickname {
+  font-weight: 600;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.ranking-xp {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--accent-soft);
+  white-space: nowrap;
+}
+
+/* Pódio: o topo da lista precisa se distinguir de relance, sem virar outra
+ * página. */
+.ranking-row.is-top-1 {
+  border-color: rgba(244, 215, 77, 0.55);
+  background: rgba(244, 215, 77, 0.10);
+}
+
+.ranking-row.is-top-1 .ranking-position,
+.ranking-row.is-top-1 .ranking-xp {
+  color: var(--accent);
+}
+
+.ranking-row.is-top-2 {
+  border-color: rgba(226, 232, 240, 0.32);
+}
+
+.ranking-row.is-top-3 {
+  border-color: rgba(205, 127, 50, 0.45);
+}
+
 .registration-textarea {
   min-height: 96px;
   resize: vertical;
@@ -1718,7 +1816,7 @@ footer a {
     grid-template-columns: 1fr;
   }
 
-  .nav-right {
+  .nav-right:not(.nav-right-static) {
     position: absolute;
     top: 60px;
     right: 4vw;
@@ -1732,8 +1830,14 @@ footer a {
     border: 1px solid var(--border-soft);
   }
 
-  .nav-right.open {
+  .nav-right:not(.nav-right-static).open {
     display: flex;
+  }
+
+  .nav-right-static {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .9rem;
   }
 
   .nav-toggle {

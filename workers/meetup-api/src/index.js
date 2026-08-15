@@ -172,7 +172,9 @@ function truncateError(value, maxLength = 500) {
 
 async function getMeetupBySlug(db, slug) {
   return db
-    .prepare("SELECT slug, title, event_date, capacity, registrations_count, is_open FROM meetups WHERE slug = ?")
+    .prepare(
+      "SELECT slug, title, event_date, duration_minutes, capacity, registrations_count, is_open FROM meetups WHERE slug = ?"
+    )
     .bind(slug)
     .first();
 }
@@ -561,6 +563,24 @@ const MAGIC_LINK_WINDOW_MINUTES = 15;
 const MAGIC_LINK_MAX_PER_WINDOW = 3;
 const SESSION_TTL_MINUTES = 30;
 const CANCEL_CONFIRMATION_WORD = "CANCELAR";
+const CERTIFICATE_DELAY_HOURS = 24;
+// Sem I, O, 0 e 1: o código é lido em voz alta e digitado a partir de um PDF
+// impresso. 32 símbolos também dividem 256 exatamente, então o sorteio byte a
+// byte abaixo fica uniforme.
+const CERTIFICATE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const RANKING_LIMIT = 100;
+const NICKNAME_MIN_LENGTH = 3;
+const NICKNAME_MAX_LENGTH = 24;
+// Apelidos que fariam alguém passar por organização no ranking público.
+const RESERVED_NICKNAME_FRAGMENTS = [
+  "hackinbrasil",
+  "organizador",
+  "organizacao",
+  "moderador",
+  "admin",
+  "oficial",
+  "staff"
+];
 
 const GENERIC_MAGIC_LINK_MESSAGE =
   "Se houver inscrições vinculadas a este e-mail, enviamos um link de acesso. O link vale por 15 minutos e só pode ser usado uma vez.";
@@ -834,7 +854,7 @@ async function handleMyRegistrations(env, session, corsOrigin) {
   try {
     rows = await env.DB
       .prepare(
-        "SELECT r.meetup_slug, r.name, r.created_at, m.title, m.event_date FROM registrations r JOIN meetups m ON m.slug = r.meetup_slug WHERE r.email = ? ORDER BY m.event_date DESC"
+        "SELECT r.meetup_slug, r.name, r.created_at, m.title, m.event_date, m.duration_minutes, m.xp_reward, c.code AS certificate_code FROM registrations r JOIN meetups m ON m.slug = r.meetup_slug LEFT JOIN certificates c ON c.registration_id = r.id WHERE r.email = ? ORDER BY m.event_date DESC"
       )
       .bind(session.email)
       .all();
@@ -844,14 +864,24 @@ async function handleMyRegistrations(env, session, corsOrigin) {
 
   const registrations = (Array.isArray(rows.results) ? rows.results : []).map((row) => {
     const past = isEventPast(row.event_date);
+    const availableAt = certificateAvailableAt(row);
     return {
       meetupSlug: row.meetup_slug,
       title: row.title,
       eventDate: row.event_date,
+      durationMinutes: Number(row.duration_minutes),
       name: row.name,
       registeredAt: row.created_at,
       isPast: past,
-      canCancel: !past
+      canCancel: !past,
+      xpReward: Number(row.xp_reward || 0),
+      xpEarned: past ? Number(row.xp_reward || 0) : 0,
+      certificate: {
+        available: isCertificateAvailable(availableAt),
+        availableAt,
+        code: row.certificate_code || null,
+        url: row.certificate_code ? certificateUrl(env, row.certificate_code) : null
+      }
     };
   });
 
@@ -864,10 +894,18 @@ async function handleMyRegistrations(env, session, corsOrigin) {
     return a.isPast ? bTime - aTime : aTime - bTime;
   });
 
+  let profile;
+  try {
+    profile = await getParticipantProfile(env, session.email);
+  } catch (err) {
+    return serverError(corsOrigin, "me:profile", err);
+  }
+
   return json(
     {
       email: session.email,
       confirmationWord: CANCEL_CONFIRMATION_WORD,
+      profile,
       registrations
     },
     200,
@@ -952,6 +990,284 @@ async function handleCancelRegistration(request, env, session, slug, corsOrigin,
   } catch (err) {
     return serverError(corsOrigin, "me:cancel", err);
   }
+}
+
+// Um certificado de presença não pode sair enquanto o evento ainda está
+// acontecendo, e a margem de 24h depois do fim é a regra combinada com a
+// organização. `duration_minutes` é o que diz quando o meetup terminou.
+function certificateAvailableAt(meetup) {
+  const start = Date.parse(String(meetup?.event_date || ""));
+  if (!Number.isFinite(start)) return null;
+  const durationMs = Number(meetup?.duration_minutes || 0) * 60 * 1000;
+  return new Date(start + durationMs + CERTIFICATE_DELAY_HOURS * 60 * 60 * 1000).toISOString();
+}
+
+function isCertificateAvailable(availableAt) {
+  if (!availableAt) return false;
+  const time = Date.parse(availableAt);
+  return Number.isFinite(time) && Date.now() >= time;
+}
+
+function generateCertificateCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  let chars = "";
+  for (const byte of bytes) {
+    chars += CERTIFICATE_CODE_ALPHABET[byte % CERTIFICATE_CODE_ALPHABET.length];
+  }
+  return `HIB-${chars.slice(0, 4)}-${chars.slice(4, 8)}-${chars.slice(8, 12)}`;
+}
+
+function isCertificateCode(value) {
+  return /^HIB-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(value);
+}
+
+function certificateUrl(env, code) {
+  return `${getSiteBaseUrl(env)}/certificado/?codigo=${encodeURIComponent(code)}`;
+}
+
+function buildCertificatePayload(env, row) {
+  return {
+    code: row.code,
+    participantName: row.participant_name,
+    meetupSlug: row.meetup_slug,
+    meetupTitle: row.title,
+    eventDate: row.event_date,
+    durationMinutes: Number(row.duration_minutes),
+    issuedAt: row.issued_at,
+    url: certificateUrl(env, row.code)
+  };
+}
+
+async function findCertificateByRegistration(env, registrationId) {
+  return env.DB
+    .prepare(
+      "SELECT c.code, c.participant_name, c.duration_minutes, c.issued_at, c.meetup_slug, m.title, m.event_date FROM certificates c JOIN meetups m ON m.slug = c.meetup_slug WHERE c.registration_id = ?"
+    )
+    .bind(registrationId)
+    .first();
+}
+
+async function handleIssueCertificate(env, session, slug, corsOrigin) {
+  try {
+    const registration = await env.DB
+      .prepare("SELECT id, name FROM registrations WHERE meetup_slug = ? AND email = ?")
+      .bind(slug, session.email)
+      .first();
+
+    if (!registration) {
+      return json({error: "Inscrição não encontrada"}, 404, corsOrigin);
+    }
+
+    const meetup = await getMeetupBySlug(env.DB, slug);
+    if (!meetup) return json({error: "Meetup not found"}, 404, corsOrigin);
+
+    const availableAt = certificateAvailableAt(meetup);
+    if (!isCertificateAvailable(availableAt)) {
+      return json(
+        {
+          error: `O certificado fica disponível ${CERTIFICATE_DELAY_HOURS} horas após o fim do meetup.`,
+          availableAt
+        },
+        409,
+        corsOrigin
+      );
+    }
+
+    // Emitir de novo devolve o mesmo documento: o código já pode estar impresso,
+    // arquivado ou enviado para um RH.
+    let certificate = await findCertificateByRegistration(env, registration.id);
+
+    if (!certificate) {
+      await env.DB
+        .prepare(
+          "INSERT INTO certificates (code, meetup_slug, registration_id, participant_name, duration_minutes) VALUES (?, ?, ?, ?, ?) ON CONFLICT (meetup_slug, registration_id) DO NOTHING"
+        )
+        .bind(
+          generateCertificateCode(),
+          slug,
+          registration.id,
+          registration.name,
+          meetup.duration_minutes
+        )
+        .run();
+
+      // Relê em vez de confiar no INSERT: dois cliques simultâneos fazem um dos
+      // dois cair no DO NOTHING, e os dois precisam receber o mesmo código.
+      certificate = await findCertificateByRegistration(env, registration.id);
+    }
+
+    if (!certificate) {
+      return serverError(
+        corsOrigin,
+        "me:certificate",
+        new Error("certificate row missing right after insert")
+      );
+    }
+
+    return json({ok: true, certificate: buildCertificatePayload(env, certificate)}, 200, corsOrigin);
+  } catch (err) {
+    return serverError(corsOrigin, "me:certificate", err);
+  }
+}
+
+// Endpoint público: é assim que um RH ou uma faculdade confere um certificado
+// que recebeu. Responde apenas a quem tem o código — 60 bits sorteados, impressos
+// no próprio documento — e nunca devolve e-mail, CPF ou telefone.
+async function handleCertificateLookup(env, rawCode, corsOrigin) {
+  const code = String(rawCode || "").trim().toUpperCase();
+  const notFound = json({error: "Certificado não encontrado"}, 404, corsOrigin);
+
+  if (!isCertificateCode(code)) return notFound;
+
+  let row;
+  try {
+    row = await env.DB
+      .prepare(
+        "SELECT c.code, c.participant_name, c.duration_minutes, c.issued_at, c.meetup_slug, m.title, m.event_date FROM certificates c JOIN meetups m ON m.slug = c.meetup_slug WHERE c.code = ?"
+      )
+      .bind(code)
+      .first();
+  } catch (err) {
+    return serverError(corsOrigin, "certificates:lookup", err);
+  }
+
+  if (!row) return notFound;
+
+  return json({certificate: buildCertificatePayload(env, row)}, 200, corsOrigin);
+}
+
+// Só pontua meetup que já terminou: estar inscrito no próximo não é
+// participação. É a mesma leitura de "acabou" que o certificado usa.
+const ENDED_MEETUP_CONDITION =
+  "datetime(m.event_date, '+' || m.duration_minutes || ' minutes') <= datetime('now')";
+
+function normalizeNickname(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, NICKNAME_MAX_LENGTH);
+}
+
+// Acento e caixa não distinguem apelidos: "Ana", "ana" e "Aná" são a mesma
+// pessoa aos olhos de quem lê a lista.
+function nicknameKey(nickname) {
+  return String(nickname || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function isValidNickname(nickname) {
+  if (nickname.length < NICKNAME_MIN_LENGTH || nickname.length > NICKNAME_MAX_LENGTH) return false;
+  // Começa e termina com letra ou número; no meio aceita espaço, ponto, hífen
+  // e underscore. Sem emoji, sem controle, sem RTL override.
+  return /^[\p{L}\p{N}][\p{L}\p{N} ._-]*[\p{L}\p{N}]$/u.test(nickname);
+}
+
+function isReservedNickname(nickname) {
+  const compact = nicknameKey(nickname).replace(/[^a-z0-9]/g, "");
+  return RESERVED_NICKNAME_FRAGMENTS.some((fragment) => compact.includes(fragment));
+}
+
+async function getParticipantProfile(env, email) {
+  const row = await env.DB
+    .prepare("SELECT nickname, is_public FROM participant_profiles WHERE email = ?")
+    .bind(email)
+    .first();
+
+  const totals = await env.DB
+    .prepare(
+      `SELECT COALESCE(SUM(m.xp_reward), 0) AS xp, COUNT(*) AS meetups FROM registrations r JOIN meetups m ON m.slug = r.meetup_slug WHERE r.email = ? AND ${ENDED_MEETUP_CONDITION}`
+    )
+    .bind(email)
+    .first();
+
+  return {
+    nickname: row?.nickname || null,
+    isPublic: Number(row?.is_public || 0) === 1,
+    xp: Number(totals?.xp || 0),
+    meetupsAttended: Number(totals?.meetups || 0),
+    nicknameMinLength: NICKNAME_MIN_LENGTH,
+    nicknameMaxLength: NICKNAME_MAX_LENGTH
+  };
+}
+
+async function handleUpdateProfile(request, env, session, corsOrigin) {
+  const parsed = await readJsonBody(request, corsOrigin);
+  if (parsed.error) return parsed.error;
+
+  const nickname = normalizeNickname(parsed.body.nickname);
+  const isPublic = parsed.body.isPublic === true;
+
+  if (!isValidNickname(nickname)) {
+    return json(
+      {
+        error: `Apelido inválido. Use de ${NICKNAME_MIN_LENGTH} a ${NICKNAME_MAX_LENGTH} caracteres, começando e terminando com letra ou número.`
+      },
+      400,
+      corsOrigin
+    );
+  }
+
+  if (isReservedNickname(nickname)) {
+    return json({error: "Esse apelido é reservado. Escolha outro."}, 400, corsOrigin);
+  }
+
+  try {
+    await env.DB
+      .prepare(
+        "INSERT INTO participant_profiles (email, nickname, nickname_key, is_public) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO UPDATE SET nickname = excluded.nickname, nickname_key = excluded.nickname_key, is_public = excluded.is_public, updated_at = CURRENT_TIMESTAMP"
+      )
+      .bind(session.email, nickname, nicknameKey(nickname), isPublic ? 1 : 0)
+      .run();
+  } catch (err) {
+    // O ON CONFLICT acima resolve só a colisão por e-mail; a de apelido chega
+    // aqui como violação de UNIQUE.
+    if (String(err?.message || err || "").includes("UNIQUE constraint failed")) {
+      return json({error: "Esse apelido já está em uso. Escolha outro."}, 409, corsOrigin);
+    }
+    return serverError(corsOrigin, "me:profileUpdate", err);
+  }
+
+  let profile;
+  try {
+    profile = await getParticipantProfile(env, session.email);
+  } catch (err) {
+    return serverError(corsOrigin, "me:profileUpdate", err);
+  }
+
+  return json(
+    {
+      ok: true,
+      message: profile.isPublic
+        ? "Perfil salvo. Você já aparece no ranking da comunidade."
+        : "Perfil salvo. Você não aparece no ranking.",
+      profile
+    },
+    200,
+    corsOrigin
+  );
+}
+
+// Público e anônimo por construção: apelido e XP, nada mais. Nem e-mail, nem
+// nome, nem em quais meetups a pessoa esteve.
+async function handleRanking(env, corsOrigin) {
+  let rows;
+  try {
+    rows = await env.DB
+      .prepare(
+        `SELECT p.nickname, COALESCE(SUM(m.xp_reward), 0) AS xp FROM participant_profiles p LEFT JOIN registrations r ON r.email = p.email LEFT JOIN meetups m ON m.slug = r.meetup_slug AND ${ENDED_MEETUP_CONDITION} WHERE p.is_public = 1 GROUP BY p.id ORDER BY xp DESC, p.nickname ASC LIMIT ?`
+      )
+      .bind(RANKING_LIMIT)
+      .all();
+  } catch (err) {
+    return serverError(corsOrigin, "ranking", err);
+  }
+
+  const ranking = (Array.isArray(rows.results) ? rows.results : []).map((row, index) => ({
+    position: index + 1,
+    nickname: row.nickname,
+    xp: Number(row.xp || 0)
+  }));
+
+  return json({limit: RANKING_LIMIT, ranking}, 200, corsOrigin);
 }
 
 async function handleLogout(env, session, corsOrigin) {
@@ -1515,6 +1831,30 @@ export default {
       if (request.method === "POST" && cancelMatch) {
         return withSession(request, env, corsOrigin, (session) =>
           handleCancelRegistration(request, env, session, cancelMatch[1], corsOrigin, ctx)
+        );
+      }
+
+      const certificateMatch = url.pathname.match(
+        /^\/api\/me\/registrations\/([a-z0-9-]+)\/certificate$/
+      );
+      if (request.method === "POST" && certificateMatch) {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleIssueCertificate(env, session, certificateMatch[1], corsOrigin)
+        );
+      }
+
+      const certificateLookupMatch = url.pathname.match(/^\/api\/certificates\/([A-Za-z0-9-]{8,32})$/);
+      if (request.method === "GET" && certificateLookupMatch) {
+        return handleCertificateLookup(env, certificateLookupMatch[1], corsOrigin);
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/ranking") {
+        return handleRanking(env, corsOrigin);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/me/profile") {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleUpdateProfile(request, env, session, corsOrigin)
         );
       }
 

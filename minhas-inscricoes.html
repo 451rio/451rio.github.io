@@ -7,27 +7,18 @@ permalink: /minhas-inscricoes/
 referrer_policy: no-referrer
 sitemap: false
 ---
-<header class="nav">
-  <div class="nav-left">
-    <a class="nav-brand" href="{{ '/' | relative_url }}">
-      <img class="nav-logo" src="{{ '/assets/images/hackinbrasil.png' | relative_url }}" alt="Logo Hack in Brasil">
-      <span>Hack in Brasil</span>
-    </a>
-    <span class="nav-logo-tag">Inscrições</span>
-  </div>
-  <nav class="nav-right nav-right-static">
-    <a class="nav-link" href="{{ '/' | relative_url }}">Voltar para início</a>
-  </nav>
-</header>
+{% include nav.html tag="Inscrições" back_url="/" back_label="Voltar para início" %}
 
-<main class="meetup-page" id="subscriptions-page" data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev">
+<main class="meetup-page" id="subscriptions-page"
+      data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev"
+      data-certificate-url="{{ '/certificado/' | relative_url }}">
   <section class="meetup-card">
     <p class="hero-kicker">Área de participante</p>
     <h1 class="meetup-title">Minhas inscrições</h1>
     <p class="meetup-subtitle">
-      Veja os meetups em que você está inscrito e cancele sua vaga se não puder comparecer — assim
-      outra pessoa da comunidade pode ocupá-la. O acesso é feito por um link enviado para o seu
-      e-mail, sem senha.
+      Veja os meetups em que você está inscrito, emita o certificado dos que já aconteceram e
+      cancele sua vaga se não puder comparecer — assim outra pessoa da comunidade pode ocupá-la.
+      O acesso é feito por um link enviado para o seu e-mail, sem senha.
     </p>
   </section>
 
@@ -55,6 +46,38 @@ sitemap: false
       </div>
       <div class="registration-actions">
         <button class="btn btn-primary" type="submit" id="magic-link-submit">Receber link de acesso</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="meetup-card" id="profile-section" hidden>
+    <div class="account-bar">
+      <div>
+        <h2>Ranking da comunidade</h2>
+        <p class="meetup-subtitle" id="profile-summary"></p>
+      </div>
+      <a class="btn btn-ghost" href="{{ '/ranking/' | relative_url }}">Ver ranking</a>
+    </div>
+
+    <form id="profile-form" class="registration-form">
+      <div class="registration-field registration-field-full">
+        <label for="profile-nickname">Apelido no ranking</label>
+        <input id="profile-nickname" class="registration-input" type="text" name="nickname"
+               placeholder="Ex.: n0ct4mbul4" autocomplete="off" autocorrect="off"
+               spellcheck="false" maxlength="24" required>
+        <small class="registration-help" id="profile-nickname-help">
+          De 3 a 24 caracteres. É a única coisa que aparece no ranking, junto do seu XP —
+          seu nome e seu e-mail nunca são mostrados.
+        </small>
+      </div>
+
+      <label class="registration-consent" for="profile-public">
+        <input id="profile-public" type="checkbox" name="isPublic">
+        <span>Quero aparecer no ranking público da comunidade.</span>
+      </label>
+
+      <div class="profile-actions">
+        <button class="btn btn-primary" type="submit" id="profile-submit">Salvar preferências</button>
       </div>
     </form>
   </section>

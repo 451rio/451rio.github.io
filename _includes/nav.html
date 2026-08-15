@@ -1,0 +1,30 @@
+{%- comment -%}
+  Barra de navegação de todas as páginas.
+
+  Parâmetros (todos opcionais):
+    tag         etiqueta ao lado da marca — padrão "Comunidade"
+    back_url    destino do link de retorno — padrão "/"
+    back_label  texto do link de retorno; sem ele, o link não aparece
+
+  O link "Minha conta" some dentro da própria área de inscrições: apontar para
+  a página em que a pessoa já está só ocupa espaço.
+{%- endcomment -%}
+{%- assign nav_tag = include.tag | default: "Comunidade" -%}
+{%- assign nav_back_url = include.back_url | default: "/" -%}
+<header class="nav">
+  <div class="nav-left">
+    <a class="nav-brand" href="{{ '/' | relative_url }}">
+      <img class="nav-logo" src="{{ '/assets/images/hackinbrasil.png' | relative_url }}" alt="Logo Hack in Brasil">
+      <span>Hack in Brasil</span>
+    </a>
+    <span class="nav-logo-tag">{{ nav_tag }}</span>
+  </div>
+  <nav class="nav-right nav-right-static">
+    {%- if include.back_label %}
+    <a class="nav-link" href="{{ nav_back_url | relative_url }}">{{ include.back_label }}</a>
+    {%- endif %}
+    {%- unless page.url == '/minhas-inscricoes/' %}
+    <a class="nav-link nav-link-account" href="{{ '/minhas-inscricoes/' | relative_url }}">Minha conta</a>
+    {%- endunless %}
+  </nav>
+</header>
