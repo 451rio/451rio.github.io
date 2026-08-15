@@ -63,8 +63,12 @@ Também agenda e envia e-mails de confirmação com atraso de 10 minutos.
   (`HIB-XXXX-XXXX-XXXX`, ~60 bits). Emitir de novo devolve o mesmo código.
 - `participant_name` e `duration_minutes` são congelados na emissão: reimprimir não pode
   gerar um documento diferente do que a pessoa já tem.
-- O PDF é gerado pelo navegador (impressão) a partir de `/certificado/?codigo=...`.
-  Não há gerador de PDF no Worker.
+- O PDF é montado no próprio Worker (`src/pdf.js`) e enviado como anexo pelo Resend, a
+  pedido, para o e-mail da inscrição. Reenviar devolve o mesmo documento.
+- `GET /api/certificates/:code` é público e **não devolve o nome** — só edição, carga
+  horária e data de emissão, o suficiente para conferir um documento que já se tem em mãos.
+- `src/certificate-assets.js` é gerado (assinaturas, selo e métricas das fontes); como
+  regerar está em `docs/meetup-subscriptions.md`.
 
 ## Ranking público (`0016`)
 

@@ -1364,6 +1364,55 @@ footer a {
   color: var(--accent);
 }
 
+.certificate-lookup {
+  margin-top: 1.2rem;
+}
+
+.certificate-status {
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+.certificate-status.is-valid {
+  color: #7de0ca;
+}
+
+.certificate-status.is-invalid {
+  color: #ff9f9f;
+}
+
+.certificate-result {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: rgba(11, 20, 26, 0.55);
+}
+
+.certificate-result > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.certificate-result dt {
+  flex: 0 0 9.5rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+}
+
+.certificate-result dd {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
+  word-break: break-word;
+}
+
 .profile-actions {
   grid-column: 1 / -1;
   display: flex;

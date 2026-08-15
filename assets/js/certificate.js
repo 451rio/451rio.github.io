@@ -4,30 +4,24 @@
 
   const apiBase = (page.dataset.apiBase || "").trim().replace(/\/$/, "");
 
-  const statusCard = document.getElementById("certificate-status-card");
+  const form = document.getElementById("certificate-lookup-form");
+  const input = document.getElementById("certificate-code-input");
+  const submit = document.getElementById("certificate-lookup-submit");
   const status = document.getElementById("certificate-status");
-  const lookupForm = document.getElementById("certificate-lookup-form");
-  const lookupInput = document.getElementById("certificate-code-input");
-  const lookupSubmit = document.getElementById("certificate-lookup-submit");
+  const result = document.getElementById("certificate-result");
 
-  const viewport = document.getElementById("certificate-viewport");
-  const nameNode = document.getElementById("certificate-name");
-  const participationNode = document.getElementById("certificate-participation");
-  const issuedNode = document.getElementById("certificate-issued");
-  const codeNode = document.getElementById("certificate-code");
+  const fields = {
+    meetup: document.getElementById("certificate-meetup"),
+    date: document.getElementById("certificate-date"),
+    duration: document.getElementById("certificate-duration"),
+    issued: document.getElementById("certificate-issued"),
+    code: document.getElementById("certificate-code")
+  };
 
-  const actions = document.getElementById("certificate-actions");
-  const printButton = document.getElementById("certificate-print");
-  const shareUrlNode = document.getElementById("certificate-share-url");
+  const required = [form, input, submit, status, result].concat(Object.values(fields));
+  if (required.some((node) => !node)) return;
 
-  const requiredNodes = [
-    statusCard, status, lookupForm, lookupInput, lookupSubmit,
-    viewport, nameNode, participationNode, issuedNode, codeNode,
-    actions, printButton, shareUrlNode
-  ];
-  if (requiredNodes.some((node) => !node)) return;
-
-  // O código é sorteado em blocos de 4, mas ninguém deveria precisar acertar os
+  // O número é sorteado em blocos de 4, mas ninguém deveria precisar acertar os
   // hífens: aceita com ou sem separador, em qualquer caixa.
   function normalizeCode(value) {
     const raw = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -37,8 +31,7 @@
   }
 
   // D1 devolve CURRENT_TIMESTAMP como "YYYY-MM-DD HH:MM:SS" em UTC, sem fuso.
-  // Date.parse leria isso como horário local e adiantaria o certificado em
-  // algumas horas.
+  // Date.parse leria isso como horário local e mudaria a data de emissão.
   function parseTimestamp(value) {
     const text = String(value || "").trim();
     if (!text) return NaN;
@@ -48,24 +41,13 @@
     return Date.parse(text);
   }
 
-  function formatLongDate(value) {
+  function formatDate(value) {
     const time = parseTimestamp(value);
-    if (!Number.isFinite(time)) return "";
-    return new Date(time).toLocaleDateString("pt-BR", {
-      timeZone: "America/Sao_Paulo",
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    });
-  }
-
-  function formatShortDate(value) {
-    const time = parseTimestamp(value);
-    if (!Number.isFinite(time)) return "";
+    if (!Number.isFinite(time)) return "—";
     return new Date(time).toLocaleDateString("pt-BR", {
       timeZone: "America/Sao_Paulo",
       day: "2-digit",
-      month: "2-digit",
+      month: "long",
       year: "numeric"
     });
   }
@@ -77,58 +59,30 @@
     const parts = [];
     if (hours > 0) parts.push(`${hours} ${hours === 1 ? "hora" : "horas"}`);
     if (rest > 0) parts.push(`${rest} ${rest === 1 ? "minuto" : "minutos"}`);
-    return parts.join(" e ");
+    return parts.join(" e ") || "—";
   }
 
-  function buildParticipationSentence(certificate) {
-    const eventDate = formatLongDate(certificate.eventDate);
-    const duration = formatDuration(certificate.durationMinutes);
-
-    let sentence = "participou do evento Hack in Brasil";
-    if (eventDate) sentence += `, realizado em ${eventDate}`;
-    if (duration) sentence += `, com carga horária total de ${duration}`;
-    sentence += ", por meio da participação em palestras e conteúdos técnicos.";
-    return sentence;
-  }
-
-  function showStatus(message, options) {
-    const config = options || {};
+  function showStatus(message, kind) {
     status.textContent = message;
-    statusCard.hidden = false;
-    lookupForm.hidden = !config.showLookup;
-    viewport.hidden = true;
-    actions.hidden = true;
-    if (config.showLookup) window.setTimeout(() => lookupInput.focus(), 50);
+    status.classList.toggle("is-valid", kind === "valid");
+    status.classList.toggle("is-invalid", kind === "invalid");
+    if (kind !== "valid") result.hidden = true;
   }
 
   function render(certificate) {
-    nameNode.textContent = certificate.participantName || "";
-    participationNode.textContent = buildParticipationSentence(certificate);
+    fields.meetup.textContent = certificate.meetupTitle || "—";
+    fields.date.textContent = formatDate(certificate.eventDate);
+    fields.duration.textContent = formatDuration(certificate.durationMinutes);
+    fields.issued.textContent = formatDate(certificate.issuedAt);
+    fields.code.textContent = certificate.code || "—";
 
-    const issuedAt = formatShortDate(certificate.issuedAt);
-    issuedNode.textContent = issuedAt
-      ? `Emitido em Rio de Janeiro, Brasil, ${issuedAt}.`
-      : "Emitido em Rio de Janeiro, Brasil.";
-
-    codeNode.textContent =
-      `Certificado nº ${certificate.code} · confira em hackinbrasil.com.br/certificado/`;
-
-    const shareUrl =
-      certificate.url || `${window.location.origin}/certificado/?codigo=${certificate.code}`;
-    shareUrlNode.textContent = shareUrl;
-
-    if (certificate.participantName) {
-      document.title = `Certificado de ${certificate.participantName} | Hack in Brasil`;
-    }
-
-    statusCard.hidden = true;
-    viewport.hidden = false;
-    actions.hidden = false;
+    showStatus("Certificado válido — emitido pelo Hack in Brasil.", "valid");
+    result.hidden = false;
   }
 
-  async function loadCertificate(code) {
-    showStatus("Carregando certificado...");
-    lookupSubmit.disabled = true;
+  async function lookup(code) {
+    showStatus("Consultando...", "");
+    submit.disabled = true;
 
     let response;
     let data;
@@ -136,18 +90,23 @@
       response = await fetch(`${apiBase}/api/certificates/${encodeURIComponent(code)}`);
       data = await response.json().catch(() => ({}));
     } catch {
-      showStatus("Erro de conexão ao carregar o certificado. Tente novamente.", {showLookup: true});
-      lookupSubmit.disabled = false;
+      submit.disabled = false;
+      showStatus("Erro de conexão ao consultar. Tente novamente.", "invalid");
       return;
     }
 
-    lookupSubmit.disabled = false;
+    submit.disabled = false;
+
+    if (response.status === 404) {
+      showStatus(
+        "Não encontramos nenhum certificado com esse número. Confira os caracteres e tente de novo.",
+        "invalid"
+      );
+      return;
+    }
 
     if (!response.ok || !data.certificate) {
-      showStatus(
-        data.error || "Certificado não encontrado. Confira o código e tente de novo.",
-        {showLookup: true}
-      );
+      showStatus(data.error || "Não foi possível consultar agora. Tente novamente.", "invalid");
       return;
     }
 
@@ -157,46 +116,33 @@
   function setCodeInUrl(code) {
     const params = new URLSearchParams(window.location.search);
     params.set("codigo", code);
-    window.history.replaceState(
-      {},
-      document.title,
-      `${window.location.pathname}?${params.toString()}`
-    );
+    window.history.replaceState({}, document.title, `${window.location.pathname}?${params.toString()}`);
   }
 
-  lookupForm.addEventListener("submit", function (event) {
+  form.addEventListener("submit", function (event) {
     event.preventDefault();
 
-    const code = normalizeCode(lookupInput.value);
+    const code = normalizeCode(input.value);
     if (!code) {
-      showStatus("Código inválido. Ele tem o formato HIB-XXXX-XXXX-XXXX.", {showLookup: true});
-      lookupInput.value = String(lookupInput.value || "").trim();
+      showStatus("Número inválido. Ele tem o formato HIB-XXXX-XXXX-XXXX.", "invalid");
       return;
     }
 
-    lookupInput.value = code;
+    input.value = code;
     setCodeInUrl(code);
-    loadCertificate(code);
-  });
-
-  printButton.addEventListener("click", function () {
-    window.print();
+    lookup(code);
   });
 
   if (!apiBase) {
-    showStatus("Configuração pendente: defina o domínio da API nesta página.");
+    showStatus("Configuração pendente: defina o domínio da API nesta página.", "invalid");
     return;
   }
 
+  // Link com o número já preenchido (o e-mail manda um assim) consulta sozinho.
   const params = new URLSearchParams(window.location.search);
-  const requestedCode = normalizeCode(params.get("codigo") || params.get("code") || "");
-
-  if (requestedCode) {
-    loadCertificate(requestedCode);
-  } else {
-    showStatus(
-      "Informe o código impresso no certificado para visualizá-lo e conferir sua autenticidade.",
-      {showLookup: true}
-    );
+  const requested = normalizeCode(params.get("codigo") || params.get("code") || "");
+  if (requested) {
+    input.value = requested;
+    lookup(requested);
   }
 })();

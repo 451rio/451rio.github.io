@@ -15,7 +15,8 @@ This project keeps a static Jekyll frontend and uses Cloudflare Workers + D1 for
 - Frontend form: `meetup-25-03-2026.html`
 - Frontend client logic: `assets/js/meetup-registration.js`
 - Self-service area: `minhas-inscricoes.html` + `assets/js/meetup-subscriptions.js`
-- Participation certificate: `certificado.html` + `assets/js/certificate.js` + `assets/css/certificate.css`
+- Certificate validation page: `certificado.html` + `assets/js/certificate.js`
+- Certificate PDF generator: `workers/meetup-api/src/pdf.js` + `src/certificate-assets.js`
 - Public ranking: `ranking.html` + `assets/js/ranking.js`
 - Shared navigation: `_includes/nav.html` (carries the "Minha conta" link on every page)
 - Worker API: `workers/meetup-api/src/index.js`
@@ -261,15 +262,20 @@ Responses: `200` success, `400` wrong confirmation word, `404` no registration,
 
 ### `POST /api/me/registrations/:slug/certificate`
 
-Requires `Authorization: Bearer <session token>`. Issues (or re-returns) the
-participation certificate.
+Requires `Authorization: Bearer <session token>`. Issues the certificate and
+**e-mails the PDF** to the address of the registration.
 
 - `404` when the session's e-mail has no registration for that meetup.
 - `409` while the certificate is not available yet, with `availableAt` in the body.
   Availability is `event_date + duration_minutes + 24h`: a presence document should not
   exist while the meetup is still wrapping up.
-- `200` with `certificate`: `code`, `participantName`, `meetupSlug`, `meetupTitle`,
-  `eventDate`, `durationMinutes`, `issuedAt`, `url`.
+- `200` with `code` and a message naming the address the PDF went to.
+- `502` when the certificate was stored but Resend refused it; the message says exactly
+  that, because the code already exists and retrying re-sends the same document.
+
+The send is **awaited**, not backgrounded like the magic link. The person pressed a button
+to receive something: a silent failure would leave them waiting for an e-mail that never
+comes. The PDF is never stored — it is rebuilt from the certificate row on every send.
 
 Issuing twice returns the **same** code. The insert uses
 `ON CONFLICT (meetup_slug, registration_id) DO NOTHING` followed by a re-read, so two
@@ -281,8 +287,15 @@ Public, no session. This is how a company or university checks a certificate it 
 
 - Codes are 12 characters drawn from a 32-symbol alphabet without `I`, `O`, `0` and `1`
   (~60 bits), so they cannot be guessed; lookup is case-insensitive.
-- Returns the same `certificate` payload as above — never e-mail, CPF or phone.
+- Returns `{valid: true, certificate: {code, meetupTitle, eventDate, durationMinutes, issuedAt}}`.
+  **No participant name**, and no e-mail, CPF or phone.
 - `404` for unknown or malformed codes.
+
+Holding a code proves nothing about a person: it confirms the edition, the course load and
+the issue date of a document whose name the verifier already has in front of them. The
+trade-off is deliberate and worth knowing — a valid code reused on a forged document with a
+different name still validates. Confirming the name would require accepting it as input and
+answering matches/does-not-match, which is a different feature.
 
 ### `POST /api/me/profile`
 
@@ -290,8 +303,14 @@ Requires `Authorization: Bearer <session token>`. Request JSON: `nickname`, `isP
 
 - Nickname: 3–24 characters, starts and ends with a letter or digit, allows space, `.`,
   `-` and `_` in between. No emoji, no control characters, no RTL overrides.
+- Too long is **rejected**, never truncated — silently storing a different nickname than
+  the one typed would only surface later, in public, on the ranking. Each failure names
+  what is wrong (`muito curto` / `muito longo: N caracteres` / formato), and the page
+  mirrors the message on the field itself, not only in the modal.
 - Names that would pass someone off as the organisation (`hackinbrasil`, `organizador`,
-  `admin`, `staff`, ...) are rejected with `400`.
+  `admin`, `staff`, ...) are rejected with `400`. The match is by **whole word** (plus the
+  accent/case-insensitive compact form, so `Hack In Brasil` is caught): matching by
+  substring rejected legitimate nicknames like `Gustaff` and `adminstrador`.
 - A nickname already taken by someone else returns `409`.
 - `200` returns the updated `profile`.
 
@@ -411,21 +430,43 @@ the button stays disabled until the typed text matches, and the Worker validates
 
 ## Participation certificate
 
-- Issued from `/minhas-inscricoes/`: past meetups show **Gerar certificado** once the
-  24h window has elapsed, and **Ver certificado** (a plain link) after that. The tab is
-  opened synchronously on click, before the POST, so pop-up blockers do not swallow it.
-- `/certificado/?codigo=HIB-...` renders the document and doubles as the public
-  verification page: with no code it shows a lookup form.
-- The certificate is HTML/CSS, printed to PDF by the browser (**Baixar em PDF** →
-  *Salvar como PDF*, landscape). There is no PDF generator in the Worker.
-- Layout is A4 landscape with a fixed aspect ratio, typed in container units (`cqw`), so
-  screen and paper are the same document at different scales. `@page { size: A4 landscape }`
-  and the print rules live in `assets/css/certificate.css`, loaded only on that page via
-  the `extra_css` front-matter hook — in `style.css` they would change how every other
-  page prints.
-- Signatures use Allura (self-hosted, OFL) over the co-organiser names; the seal is
-  `assets/images/hackinbrasil-seal.png`, a copy of the logo with the baked-in black
-  background keyed out (the original would be a black square on the light band).
+The certificate is a **PDF e-mailed to the address of the registration**. The site never
+renders the document and never exposes the participant's name.
+
+- Requested from `/minhas-inscricoes/`: past meetups show **Receber certificado por e-mail**
+  once the 24h window has elapsed, and **Reenviar certificado por e-mail** afterwards.
+  Re-sending returns the same code and the same document.
+- `/certificado/` is a validation page only: type the code, get valid/invalid plus edition,
+  course load and issue date. No name, ever.
+- The PDF is generated inside the Worker by `src/pdf.js`, written by hand — no library and
+  no Browser Rendering (which needs a paid plan). Text uses the base-14 Helvetica with
+  WinAnsi encoding, which covers Portuguese; the olive background is an axial shading.
+- Layout measurements are kept in `cqw` units (1% of the sheet width), the same unit the
+  HTML version used, so the two descriptions of the same document do not drift.
+
+### Regenerating `src/certificate-assets.js`
+
+That file is **generated** and holds three things: the signature band as a 1-bit stencil
+(names in Herr Von Muellerhoff, labels in DM Mono and the rules), the seal composited onto
+the band colour, and the Helvetica glyph widths.
+
+1. Render the band at 3508x521 px (297mm x 44.1mm at 300dpi) with the signature font,
+   black on white.
+2. Threshold it to 1 bit, deflate, and base64 it into `SIGNATURES`.
+3. Composite `assets/images/hackinbrasil-seal.png` over `#e4e4e4`, deflate the raw RGB and
+   base64 it into `SEAL` — flattening the alpha there is what lets the PDF skip an SMask.
+4. Widths come from the Adobe AFM files for Helvetica and Helvetica-Bold, indexed by
+   WinAnsi byte.
+
+The stencil goes into the PDF as an `/ImageMask` with `/Decode [1 0]` (bit 1 = ink), which
+is why 223 KB of bitmap costs only ~8 KB in the file.
+
+### Why not print-to-PDF
+
+The first version rendered the certificate as HTML and let the browser print it. It was
+dropped with the move to e-mail delivery: a document that must arrive in an inbox has to be
+produced server-side, and keeping both paths would mean maintaining two descriptions of the
+same layout.
 
 ## Public ranking
 

@@ -4,7 +4,6 @@
 
   const F = window.HIBForms;
   const apiBase = (page.dataset.apiBase || "").trim().replace(/\/$/, "");
-  const certificatePath = (page.dataset.certificateUrl || "/certificado/").trim();
 
   const loadingSection = document.getElementById("loading-section");
   const loadingStatus = document.getElementById("loading-status");
@@ -24,6 +23,7 @@
   const profileNickname = document.getElementById("profile-nickname");
   const profilePublic = document.getElementById("profile-public");
   const profileSubmit = document.getElementById("profile-submit");
+  const profileNicknameHelp = document.getElementById("profile-nickname-help");
 
   const listSection = document.getElementById("subscriptions-section");
   const list = document.getElementById("subscription-list");
@@ -45,6 +45,7 @@
     loadingSection, loadingStatus, retryButton,
     loginSection, loginStatus, loginForm, loginEmail, loginSubmit, captchaQuestion, captchaInput,
     profileSection, profileSummary, profileForm, profileNickname, profilePublic, profileSubmit,
+    profileNicknameHelp,
     listSection, list, accountEmail, logoutButton,
     cancelModal, cancelForm, cancelMessage, cancelInput, cancelSubmit, cancelWordLabel,
     feedbackModal, feedbackTitle, feedbackMessage
@@ -63,6 +64,11 @@
 
   let confirmationWord = "CANCELAR";
   let pendingCancellation = null;
+
+  // Os limites do apelido chegam na resposta do perfil: assim o formulário
+  // nunca fica discordando da regra que o Worker aplica de verdade.
+  const nicknameLimits = { min: 3, max: 24 };
+  const nicknameHelpDefault = profileNicknameHelp.textContent;
 
   function getSessionToken() {
     try {
@@ -111,9 +117,7 @@
     });
   }
 
-  function certificateUrl(code) {
-    return `${certificatePath}?codigo=${encodeURIComponent(code)}`;
-  }
+
 
   function showOnly(section) {
     loadingSection.hidden = section !== loadingSection;
@@ -125,6 +129,41 @@
   function formatXp(xp) {
     return `${Number(xp || 0).toLocaleString("pt-BR")} XP`;
   }
+
+  function setNicknameError(message) {
+    profileNickname.classList.toggle("is-invalid", Boolean(message));
+    profileNickname.setAttribute("aria-invalid", message ? "true" : "false");
+    profileNicknameHelp.classList.toggle("is-error", Boolean(message));
+    profileNicknameHelp.textContent = message || nicknameHelpDefault;
+  }
+
+  function normalizeNicknameInput(value) {
+    return String(value || "").trim().replace(/\s+/g, " ");
+  }
+
+  // Mesma checagem do Worker, na mesma ordem — o que muda é só quando ela roda.
+  function validateNickname(value) {
+    const nickname = normalizeNicknameInput(value);
+    if (!nickname) return "Escolha um apelido para aparecer no ranking.";
+    if (nickname.length < nicknameLimits.min) {
+      return `Apelido muito curto. Use pelo menos ${nicknameLimits.min} caracteres.`;
+    }
+    if (nickname.length > nicknameLimits.max) {
+      return `Apelido muito longo: ${nickname.length} caracteres. O limite é ${nicknameLimits.max}.`;
+    }
+    return "";
+  }
+
+  // Enquanto digita, só o excesso é apontado: avisar "muito curto" na primeira
+  // letra seria implicar com quem ainda está escrevendo.
+  profileNickname.addEventListener("input", function () {
+    const nickname = normalizeNicknameInput(profileNickname.value);
+    setNicknameError(
+      nickname.length > nicknameLimits.max
+        ? `Apelido muito longo: ${nickname.length} caracteres. O limite é ${nicknameLimits.max}.`
+        : ""
+    );
+  });
 
   function renderProfile(profile) {
     const data = profile || {};
@@ -139,9 +178,13 @@
       ? `Você tem ${earned} e aparece no ranking como "${data.nickname}".`
       : `Você tem ${earned}. Seu perfil está privado: ninguém vê você no ranking.`;
 
+    if (Number(data.nicknameMinLength) > 0) nicknameLimits.min = Number(data.nicknameMinLength);
+    if (Number(data.nicknameMaxLength) > 0) nicknameLimits.max = Number(data.nicknameMaxLength);
+
     // Não sobrescreve o que a pessoa está digitando enquanto salva.
     if (document.activeElement !== profileNickname) {
       profileNickname.value = data.nickname || "";
+      setNicknameError("");
     }
     profilePublic.checked = Boolean(data.isPublic);
   }
@@ -246,23 +289,19 @@
         openCancelModal(registration);
       });
       actions.append(cancelButton);
-    } else if (certificate.code) {
-      // Já emitido: um link comum abre na hora e nenhum bloqueador de pop-up
-      // se mete no caminho.
-      const link = document.createElement("a");
-      link.className = "btn btn-primary";
-      link.href = certificateUrl(certificate.code);
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.textContent = "Ver certificado";
-      actions.append(link);
     } else if (certificate.available) {
+      // Emitido ou não, a ação é a mesma: mandar o PDF para o e-mail da
+      // inscrição. Reemitir devolve o mesmo documento, com o mesmo número.
+      const label = certificate.code
+        ? "Reenviar certificado por e-mail"
+        : "Receber certificado por e-mail";
+
       const certificateButton = document.createElement("button");
       certificateButton.type = "button";
-      certificateButton.className = "btn btn-primary";
-      certificateButton.textContent = "Gerar certificado";
+      certificateButton.className = certificate.code ? "btn btn-ghost" : "btn btn-primary";
+      certificateButton.textContent = label;
       certificateButton.addEventListener("click", function () {
-        issueCertificate(registration, certificateButton);
+        issueCertificate(registration, certificateButton, label);
       });
       actions.append(certificateButton);
     } else {
@@ -278,14 +317,9 @@
     return card;
   }
 
-  async function issueCertificate(registration, button) {
-    // A aba precisa ser aberta dentro do clique: se ela esperar o POST, o
-    // navegador trata como pop-up e bloqueia.
-    const tab = window.open("", "_blank");
-    if (tab) tab.opener = null;
-
+  async function issueCertificate(registration, button, label) {
     button.disabled = true;
-    button.textContent = "Gerando...";
+    button.textContent = "Enviando...";
 
     let result;
     try {
@@ -294,9 +328,8 @@
         { method: "POST" }
       );
     } catch {
-      if (tab) tab.close();
       button.disabled = false;
-      button.textContent = "Gerar certificado";
+      button.textContent = label;
       feedback.show("Erro de conexão. Tente novamente.", "error");
       return;
     }
@@ -304,34 +337,21 @@
     const { response, data } = result;
 
     if (response.status === 401) {
-      if (tab) tab.close();
       setSessionToken("");
       showLogin(SESSION_EXPIRED_MESSAGE);
       return;
     }
 
-    if (!response.ok || !data.certificate) {
-      if (tab) tab.close();
-      button.disabled = false;
-      button.textContent = "Gerar certificado";
-      feedback.show(data.error || "Não foi possível gerar o certificado.", "error");
+    button.disabled = false;
+    button.textContent = label;
+
+    if (!response.ok) {
+      feedback.show(data.error || "Não foi possível enviar o certificado.", "error");
       await loadRegistrations();
       return;
     }
 
-    const url = certificateUrl(data.certificate.code);
-
-    if (tab) {
-      tab.location.replace(url);
-    } else {
-      // Pop-up bloqueado: a lista recarrega logo abaixo com o botão
-      // "Ver certificado", que é um link comum.
-      feedback.show(
-        "Certificado emitido. Use o botão \"Ver certificado\" no meetup para abri-lo.",
-        "success"
-      );
-    }
-
+    feedback.show(data.message || "Certificado enviado para o seu e-mail.", "success");
     await loadRegistrations();
   }
 
@@ -459,12 +479,15 @@
   profileForm.addEventListener("submit", async function (event) {
     event.preventDefault();
 
-    const nickname = String(profileNickname.value || "").trim();
-    if (!nickname) {
-      feedback.show("Escolha um apelido para aparecer no ranking.", "error");
+    const nickname = normalizeNicknameInput(profileNickname.value);
+    const localError = validateNickname(nickname);
+    if (localError) {
+      setNicknameError(localError);
+      feedback.show(localError, "error");
       profileNickname.focus();
       return;
     }
+    setNicknameError("");
 
     profileSubmit.disabled = true;
     profileSubmit.textContent = "Salvando...";
@@ -495,10 +518,18 @@
     }
 
     if (!response.ok) {
-      feedback.show(data.error || "Não foi possível salvar suas preferências.", "error");
+      const message = data.error || "Não foi possível salvar suas preferências.";
+      // 400/409 são sempre sobre o apelido: o erro pertence ao campo, não só
+      // ao modal, senão ele some no primeiro clique e a pessoa perde a dica.
+      if (response.status === 400 || response.status === 409) {
+        setNicknameError(message);
+        profileNickname.focus();
+      }
+      feedback.show(message, "error");
       return;
     }
 
+    setNicknameError("");
     renderProfile(data.profile);
     feedback.show(data.message || "Preferências salvas.", "success");
   });

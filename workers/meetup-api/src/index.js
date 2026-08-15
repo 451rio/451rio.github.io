@@ -1,3 +1,5 @@
+import {buildCertificatePdf, bytesToBase64Pdf} from "./pdf.js";
+
 function json(data, status = 200, corsOrigin = "*") {
   return new Response(JSON.stringify(data), {
     status,
@@ -377,6 +379,10 @@ async function sendEmailWithResend(env, job) {
     body.reply_to = sanitizeHeaderValue(replyTo);
   }
 
+  if (Array.isArray(job.attachments) && job.attachments.length > 0) {
+    body.attachments = job.attachments;
+  }
+
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -572,7 +578,7 @@ const RANKING_LIMIT = 100;
 const NICKNAME_MIN_LENGTH = 3;
 const NICKNAME_MAX_LENGTH = 24;
 // Apelidos que fariam alguém passar por organização no ranking público.
-const RESERVED_NICKNAME_FRAGMENTS = [
+const RESERVED_NICKNAMES = [
   "hackinbrasil",
   "organizador",
   "organizacao",
@@ -602,6 +608,27 @@ function formatMeetupDate(eventDate) {
     month: "2-digit",
     year: "numeric"
   });
+}
+
+function formatLongDate(eventDate) {
+  const time = Date.parse(String(eventDate || ""));
+  if (!Number.isFinite(time)) return "";
+  return new Date(time).toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function formatDuration(minutes) {
+  const total = Math.max(0, Math.round(Number(minutes) || 0));
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  const parts = [];
+  if (hours > 0) parts.push(`${hours} ${hours === 1 ? "hora" : "horas"}`);
+  if (rest > 0) parts.push(`${rest} ${rest === 1 ? "minuto" : "minutos"}`);
+  return parts.join(" e ");
 }
 
 function buildMagicLinkEmail(link) {
@@ -879,8 +906,7 @@ async function handleMyRegistrations(env, session, corsOrigin) {
       certificate: {
         available: isCertificateAvailable(availableAt),
         availableAt,
-        code: row.certificate_code || null,
-        url: row.certificate_code ? certificateUrl(env, row.certificate_code) : null
+        code: row.certificate_code || null
       }
     };
   });
@@ -1025,17 +1051,75 @@ function certificateUrl(env, code) {
   return `${getSiteBaseUrl(env)}/certificado/?codigo=${encodeURIComponent(code)}`;
 }
 
-function buildCertificatePayload(env, row) {
+// A consulta pública confirma o documento sem entregar quem é a pessoa: nome
+// só aparece no PDF, que chega pelo e-mail da inscrição. Quem já tem o
+// certificado em mãos consegue conferir edição, carga horária e emissão; quem
+// só tem o código não descobre nada sobre ninguém.
+function buildPublicCertificatePayload(row) {
   return {
     code: row.code,
-    participantName: row.participant_name,
-    meetupSlug: row.meetup_slug,
     meetupTitle: row.title,
     eventDate: row.event_date,
     durationMinutes: Number(row.duration_minutes),
-    issuedAt: row.issued_at,
-    url: certificateUrl(env, row.code)
+    issuedAt: row.issued_at
   };
+}
+
+function buildCertificateTexts(row) {
+  const eventDate = formatLongDate(row.event_date);
+  const duration = formatDuration(row.duration_minutes);
+
+  let participation = "participou do evento Hack in Brasil";
+  if (eventDate) participation += `, realizado em ${eventDate}`;
+  if (duration) participation += `, com carga horária total de ${duration}`;
+  participation += ", por meio da participação em palestras e conteúdos técnicos.";
+
+  const issuedDate = formatMeetupDate(row.issued_at);
+
+  return {
+    participantName: String(row.participant_name || ""),
+    participationSentence: participation,
+    issuedSentence: issuedDate
+      ? `Emitido em Rio de Janeiro, Brasil, ${issuedDate}.`
+      : "Emitido em Rio de Janeiro, Brasil.",
+    code: String(row.code || "")
+  };
+}
+
+function buildCertificateEmail(env, row) {
+  const eventDate = formatLongDate(row.event_date);
+  const duration = formatDuration(row.duration_minutes);
+  const validationUrl = certificateUrl(env, row.code);
+
+  const subject = `Seu certificado — ${row.title}`;
+
+  const textBody = [
+    `Olá, ${row.participant_name},`,
+    "",
+    `Seu certificado de participação no meetup de ${eventDate} está em anexo, em PDF.`,
+    `Carga horária: ${duration}.`,
+    "",
+    `Número do certificado: ${row.code}`,
+    `Qualquer pessoa pode conferir a validade dele em: ${validationUrl}`,
+    "A consulta confirma o certificado sem exibir seu nome.",
+    "",
+    "Obrigado por participar — nos vemos no próximo meetup.",
+    "",
+    "Abraços,",
+    "Equipe Hack in Brasil"
+  ].join("\n");
+
+  const htmlBody =
+    `<p>Olá, ${escapeHtml(row.participant_name)},</p>` +
+    `<p>Seu certificado de participação no meetup de ${escapeHtml(eventDate)} está em anexo, em PDF.<br>` +
+    `Carga horária: ${escapeHtml(duration)}.</p>` +
+    `<p>Número do certificado: <strong>${escapeHtml(row.code)}</strong><br>` +
+    `Qualquer pessoa pode conferir a validade dele em <a href="${escapeHtml(validationUrl)}">${escapeHtml(validationUrl)}</a> ` +
+    "— a consulta confirma o certificado sem exibir seu nome.</p>" +
+    "<p>Obrigado por participar — nos vemos no próximo meetup.</p>" +
+    "<p>Abraços,<br>Equipe Hack in Brasil</p>";
+
+  return {subject, textBody, htmlBody};
 }
 
 async function findCertificateByRegistration(env, registrationId) {
@@ -1104,7 +1188,48 @@ async function handleIssueCertificate(env, session, slug, corsOrigin) {
       );
     }
 
-    return json({ok: true, certificate: buildCertificatePayload(env, certificate)}, 200, corsOrigin);
+    // O envio é aguardado de propósito: a pessoa clicou para receber, então ela
+    // precisa saber se saiu mesmo. Falhar calado aqui seria pior que demorar um
+    // segundo a mais — e o certificado já está gravado, então tentar de novo
+    // devolve o mesmo documento.
+    const pdf = buildCertificatePdf(buildCertificateTexts(certificate));
+    const message = buildCertificateEmail(env, certificate);
+
+    try {
+      await sendEmailWithResend(env, {
+        recipient_email: session.email,
+        subject: message.subject,
+        html_body: message.htmlBody,
+        text_body: message.textBody,
+        attachments: [
+          {
+            filename: `certificado-hack-in-brasil-${certificate.code}.pdf`,
+            content: bytesToBase64Pdf(pdf)
+          }
+        ]
+      });
+    } catch (err) {
+      console.error("[me:certificate:send]", err);
+      return json(
+        {
+          error:
+            "O certificado foi emitido, mas não conseguimos enviar o e-mail agora. Tente novamente em alguns minutos.",
+          code: certificate.code
+        },
+        502,
+        corsOrigin
+      );
+    }
+
+    return json(
+      {
+        ok: true,
+        message: `Certificado enviado para ${session.email}. Verifique também a caixa de spam.`,
+        code: certificate.code
+      },
+      200,
+      corsOrigin
+    );
   } catch (err) {
     return serverError(corsOrigin, "me:certificate", err);
   }
@@ -1133,7 +1258,7 @@ async function handleCertificateLookup(env, rawCode, corsOrigin) {
 
   if (!row) return notFound;
 
-  return json({certificate: buildCertificatePayload(env, row)}, 200, corsOrigin);
+  return json({valid: true, certificate: buildPublicCertificatePayload(row)}, 200, corsOrigin);
 }
 
 // Só pontua meetup que já terminou: estar inscrito no próximo não é
@@ -1142,7 +1267,10 @@ const ENDED_MEETUP_CONDITION =
   "datetime(m.event_date, '+' || m.duration_minutes || ' minutes') <= datetime('now')";
 
 function normalizeNickname(value) {
-  return String(value || "").trim().replace(/\s+/g, " ").slice(0, NICKNAME_MAX_LENGTH);
+  // Sem corte no limite: apelido maior que o máximo tem que virar erro. Cortar
+  // em silêncio gravaria um apelido diferente do que a pessoa digitou, e ela só
+  // descobriria ao se ver no ranking com outro nome.
+  return String(value || "").trim().replace(/\s+/g, " ");
 }
 
 // Acento e caixa não distinguem apelidos: "Ana", "ana" e "Aná" são a mesma
@@ -1161,9 +1289,18 @@ function isValidNickname(nickname) {
   return /^[\p{L}\p{N}][\p{L}\p{N} ._-]*[\p{L}\p{N}]$/u.test(nickname);
 }
 
+// Palavra inteira, não pedaço. Casar por substring recusava apelido legítimo:
+// "Gustaff" batia em `staff`, "adminstrador" batia em `admin`. A forma compacta
+// entra à parte para pegar "Hack In Brasil" escrito com espaço, ponto ou hífen.
 function isReservedNickname(nickname) {
-  const compact = nicknameKey(nickname).replace(/[^a-z0-9]/g, "");
-  return RESERVED_NICKNAME_FRAGMENTS.some((fragment) => compact.includes(fragment));
+  const key = nicknameKey(nickname);
+
+  if (RESERVED_NICKNAMES.includes(key.replace(/[^a-z0-9]/g, ""))) return true;
+
+  return key
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .some((word) => RESERVED_NICKNAMES.includes(word));
 }
 
 async function getParticipantProfile(env, email) {
@@ -1196,10 +1333,32 @@ async function handleUpdateProfile(request, env, session, corsOrigin) {
   const nickname = normalizeNickname(parsed.body.nickname);
   const isPublic = parsed.body.isPublic === true;
 
+  if (!nickname) {
+    return json({error: "Escolha um apelido para aparecer no ranking."}, 400, corsOrigin);
+  }
+
+  if (nickname.length < NICKNAME_MIN_LENGTH) {
+    return json(
+      {error: `Apelido muito curto. Use pelo menos ${NICKNAME_MIN_LENGTH} caracteres.`},
+      400,
+      corsOrigin
+    );
+  }
+
+  if (nickname.length > NICKNAME_MAX_LENGTH) {
+    return json(
+      {
+        error: `Apelido muito longo: ${nickname.length} caracteres. O limite é ${NICKNAME_MAX_LENGTH}.`
+      },
+      400,
+      corsOrigin
+    );
+  }
+
   if (!isValidNickname(nickname)) {
     return json(
       {
-        error: `Apelido inválido. Use de ${NICKNAME_MIN_LENGTH} a ${NICKNAME_MAX_LENGTH} caracteres, começando e terminando com letra ou número.`
+        error: "Apelido inválido. Use letras e números, começando e terminando com letra ou número — espaço, ponto, hífen e underscore são permitidos no meio."
       },
       400,
       corsOrigin
