@@ -90,10 +90,16 @@ Opt-in profile for the public ranking (migration `0016`).
 
 ### `email_jobs`
 
+The outbox. Migration `0017` rebuilt it so it can carry more than confirmation e-mails.
+
 - `id` (PK)
+- `kind` (`confirmation` | `certificate`)
 - `meetup_slug` (FK)
-- `template_id` (FK)
-- `registration_id` (UNIQUE, FK)
+- `template_id` (FK, null for certificates)
+- `registration_id` (FK, null for certificates — unique **per confirmation**, via a partial
+  index, so a certificate can be re-queued without touching that guarantee)
+- `certificate_code` (only for certificates; the PDF is rebuilt from it at send time
+  instead of being stored)
 - `recipient_name`
 - `recipient_email`
 - `subject`
@@ -131,6 +137,17 @@ One row per magic link request (migration `0014`).
 Migration `0014` also adds `idx_registrations_email`. Login and the listing both
 filter registrations by e-mail alone, which the existing `UNIQUE (meetup_slug, email)`
 index cannot serve (wrong leading column).
+
+### `email_sends`
+
+Ledger of everything that actually left, added by migration `0017`. One row per successful
+send, holding only the kind and the timestamp — no recipient, no subject.
+
+It exists because the daily cap used to be measured by counting `sent` rows in
+`email_jobs`, which ignored every immediate send (magic link, cancellation, sponsor, talk).
+Those still spend the provider's quota, so the Worker believed it had sent 40 while Resend
+had already seen 100. Every send now passes through one function, and that function writes
+here.
 
 ### `registration_cancellations`
 
@@ -408,8 +425,16 @@ npx wrangler secret put RESEND_API_KEY
 8. Cron trigger:
 
 - `*/2 * * * *` processes pending `email_jobs`.
-- The sender uses a fixed limit of 100 sends per day.
-- Failed jobs are retried after 10 minutes, up to 5 attempts.
+- The sender stops at 100 sends per day, counted from `email_sends` — which includes the
+  immediate sends, not only the queued ones.
+- What does not fit today is rescheduled to **the next day at 11:00 UTC** (08:00 in São
+  Paulo), up to 3 times, and only then marked failed.
+- A send that fails for any other reason is retried after 10 minutes, up to 5 attempts.
+
+Immediate sends deliberately bypass the queue: a magic link that waits two minutes for the
+cron is a broken login. They consume the day's budget through the ledger, which shrinks
+what the queue may send — the ordering is intentional, since a login matters more than a
+certificate arriving today rather than tomorrow.
 
 ## Frontend integration
 

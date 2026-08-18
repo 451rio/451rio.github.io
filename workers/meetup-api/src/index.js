@@ -399,6 +399,19 @@ async function sendEmailWithResend(env, job) {
     throw new Error(message);
   }
 
+  // Registra o que saiu de fato. Envio imediato (magic link, cancelamento,
+  // patrocínio, palestra) também gasta a cota do provedor: se não entrasse
+  // aqui, o limite diário estaria medindo só uma parte do que foi enviado.
+  try {
+    await env.DB
+      .prepare("INSERT INTO email_sends (kind) VALUES (?)")
+      .bind(String(job.kind || "transactional"))
+      .run();
+  } catch (error) {
+    // Perder a linha do livro não pode desfazer um e-mail que já saiu.
+    console.error("[email:ledger]", error);
+  }
+
   return String(payload.id || "");
 }
 
@@ -435,14 +448,14 @@ const MAX_CAP_RETRIES = 3;
 async function deferJobsOverDailyCap(env) {
   await env.DB
     .prepare(
-      "UPDATE email_jobs SET send_after = datetime('now', '+12 hours'), cap_retries = cap_retries + 1, updated_at = CURRENT_TIMESTAMP, last_error = 'Limite diário de e-mails atingido; reagendado' WHERE status = 'pending' AND send_after <= CURRENT_TIMESTAMP AND cap_retries < ?"
+      "UPDATE email_jobs SET send_after = datetime('now', '+1 day', 'start of day', '+11 hours'), cap_retries = cap_retries + 1, updated_at = CURRENT_TIMESTAMP, last_error = 'Limite diário de e-mails atingido; reagendado para o dia seguinte' WHERE status = 'pending' AND send_after <= CURRENT_TIMESTAMP AND cap_retries < ?"
     )
     .bind(MAX_CAP_RETRIES)
     .run();
 
   await env.DB
     .prepare(
-      "UPDATE email_jobs SET status = 'failed', updated_at = CURRENT_TIMESTAMP, last_error = 'Limite diário de e-mails atingido após 3 reagendamentos' WHERE status = 'pending' AND send_after <= CURRENT_TIMESTAMP AND cap_retries >= ?"
+      "UPDATE email_jobs SET status = 'failed', updated_at = CURRENT_TIMESTAMP, last_error = 'Limite diário de e-mails atingido em todos os reagendamentos' WHERE status = 'pending' AND send_after <= CURRENT_TIMESTAMP AND cap_retries >= ?"
     )
     .bind(MAX_CAP_RETRIES)
     .run();
@@ -450,7 +463,7 @@ async function deferJobsOverDailyCap(env) {
 
 async function processPendingEmailJobs(env, limit = 20) {
   const sentTodayRow = await env.DB
-    .prepare("SELECT COUNT(*) AS total FROM email_jobs WHERE status = 'sent' AND date(sent_at) = date('now')")
+    .prepare("SELECT COUNT(*) AS total FROM email_sends WHERE date(sent_at) = date('now')")
     .first();
 
   const sentToday = Number(sentTodayRow?.total || 0);
@@ -463,7 +476,7 @@ async function processPendingEmailJobs(env, limit = 20) {
   const maxBatchSize = Math.min(limit, remainingForToday);
   const pending = await env.DB
     .prepare(
-      "SELECT id, meetup_slug, recipient_name, recipient_email, subject, html_body, text_body, attempts FROM email_jobs WHERE status = 'pending' AND send_after <= CURRENT_TIMESTAMP ORDER BY id ASC LIMIT ?"
+      "SELECT id, kind, meetup_slug, certificate_code, recipient_name, recipient_email, subject, html_body, text_body, attempts FROM email_jobs WHERE status = 'pending' AND send_after <= CURRENT_TIMESTAMP ORDER BY id ASC LIMIT ?"
     )
     .bind(maxBatchSize)
     .all();
@@ -485,6 +498,13 @@ async function processPendingEmailJobs(env, limit = 20) {
     const currentAttempt = Number(job.attempts || 0) + 1;
 
     try {
+      // O PDF não é guardado no banco: é remontado a partir da linha do
+      // certificado na hora do envio. Assim a fila não carrega 95 KB por job e
+      // o documento sai sempre igual ao que a consulta pública confirma.
+      if (job.kind === "certificate") {
+        job.attachments = await buildCertificateAttachment(env, job.certificate_code);
+      }
+
       const resendEmailId = await sendEmailWithResend(env, job);
       await markEmailAsSent(env, job.id, resendEmailId);
     } catch (error) {
@@ -1131,6 +1151,66 @@ async function findCertificateByRegistration(env, registrationId) {
     .first();
 }
 
+async function buildCertificateAttachment(env, code) {
+  const row = await env.DB
+    .prepare(
+      "SELECT c.code, c.participant_name, c.duration_minutes, c.issued_at, c.meetup_slug, m.title, m.event_date FROM certificates c JOIN meetups m ON m.slug = c.meetup_slug WHERE c.code = ?"
+    )
+    .bind(String(code || ""))
+    .first();
+
+  if (!row) throw new Error(`certificate ${code} not found when building the attachment`);
+
+  const pdf = buildCertificatePdf(buildCertificateTexts(row));
+  return [
+    {
+      filename: `certificado-hack-in-brasil-${row.code}.pdf`,
+      content: bytesToBase64Pdf(pdf)
+    }
+  ];
+}
+
+// Quanto ainda cabe hoje. Serve só para a mensagem ser honesta sobre quando o
+// e-mail deve chegar — quem decide de fato é o cron.
+async function remainingEmailsToday(env) {
+  const row = await env.DB
+    .prepare("SELECT COUNT(*) AS total FROM email_sends WHERE date(sent_at) = date('now')")
+    .first();
+  return Math.max(0, DAILY_EMAIL_CAP - Number(row?.total || 0));
+}
+
+async function queueCertificateEmail(env, certificate, recipientEmail) {
+  // Dois cliques seguidos não podem virar dois e-mails: se já existe job em
+  // aberto para este certificado, ele é o envio.
+  const pending = await env.DB
+    .prepare(
+      "SELECT id FROM email_jobs WHERE kind = 'certificate' AND certificate_code = ? AND status IN ('pending', 'processing')"
+    )
+    .bind(certificate.code)
+    .first();
+
+  if (pending) return false;
+
+  const message = buildCertificateEmail(env, certificate);
+
+  await env.DB
+    .prepare(
+      "INSERT INTO email_jobs (kind, meetup_slug, certificate_code, recipient_name, recipient_email, subject, text_body, html_body, send_after, status) VALUES ('certificate', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'pending')"
+    )
+    .bind(
+      certificate.meetup_slug,
+      certificate.code,
+      certificate.participant_name,
+      recipientEmail,
+      message.subject,
+      message.textBody,
+      message.htmlBody
+    )
+    .run();
+
+  return true;
+}
+
 async function handleIssueCertificate(env, session, slug, corsOrigin) {
   try {
     const registration = await env.DB
@@ -1188,43 +1268,22 @@ async function handleIssueCertificate(env, session, slug, corsOrigin) {
       );
     }
 
-    // O envio é aguardado de propósito: a pessoa clicou para receber, então ela
-    // precisa saber se saiu mesmo. Falhar calado aqui seria pior que demorar um
-    // segundo a mais — e o certificado já está gravado, então tentar de novo
-    // devolve o mesmo documento.
-    const pdf = buildCertificatePdf(buildCertificateTexts(certificate));
-    const message = buildCertificateEmail(env, certificate);
+    // Vai para a mesma fila dos e-mails de confirmação, em vez de sair na hora:
+    // é o que mantém o teto de 100 envios por dia honesto. O cron pega daqui a
+    // no máximo dois minutos, e o que não couber hoje sai amanhã de manhã.
+    const queued = await queueCertificateEmail(env, certificate, session.email);
+    const remaining = await remainingEmailsToday(env);
 
-    try {
-      await sendEmailWithResend(env, {
-        recipient_email: session.email,
-        subject: message.subject,
-        html_body: message.htmlBody,
-        text_body: message.textBody,
-        attachments: [
-          {
-            filename: `certificado-hack-in-brasil-${certificate.code}.pdf`,
-            content: bytesToBase64Pdf(pdf)
-          }
-        ]
-      });
-    } catch (err) {
-      console.error("[me:certificate:send]", err);
-      return json(
-        {
-          error:
-            "O certificado foi emitido, mas não conseguimos enviar o e-mail agora. Tente novamente em alguns minutos.",
-          code: certificate.code
-        },
-        502,
-        corsOrigin
-      );
-    }
+    const message = remaining > 0
+      ? `Certificado a caminho de ${session.email} — deve chegar em alguns minutos. Verifique também a caixa de spam.`
+      : `Certificado na fila para ${session.email}. O limite diário de envios já foi atingido, então ele sai amanhã de manhã.`;
 
     return json(
       {
         ok: true,
-        message: `Certificado enviado para ${session.email}. Verifique também a caixa de spam.`,
+        message: queued
+          ? message
+          : `Seu certificado já está na fila de envio para ${session.email}.`,
         code: certificate.code
       },
       200,

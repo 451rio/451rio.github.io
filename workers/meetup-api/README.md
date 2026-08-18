@@ -159,5 +159,13 @@ Comportamento de UX atual:
 - O conteúdo do e-mail é definido no banco em `email_templates`.
 - Inscrições antigas são carregadas para envio na primeira aplicação da migração `0002`.
 - Para editar próximas mensagens, atualize o registro em `email_templates`.
-- O limite diário está fixo em 100 envios.
-- Quando o envio falha, a próxima tentativa é reagendada para 10 minutos depois (até 5 tentativas).
+- O limite diário está fixo em 100 envios, contados na tabela `email_sends` — que registra
+  **todo** e-mail que sai, inclusive os imediatos (magic link, cancelamento, patrocínio,
+  palestra). Antes a conta olhava só a fila e ignorava esses, estourando a cota do Resend
+  sem perceber.
+- O que não couber no dia é reagendado para o dia seguinte às 11:00 UTC (08:00 em São Paulo),
+  até 3 vezes.
+- Quando o envio falha por outro motivo, a próxima tentativa é reagendada para 10 minutos
+  depois (até 5 tentativas).
+- O certificado entra nessa mesma fila (`kind = 'certificate'`); o PDF é remontado na hora
+  do envio a partir do código, então a fila não guarda anexo.
