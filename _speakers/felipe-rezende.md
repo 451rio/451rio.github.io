@@ -2,7 +2,7 @@
 layout: speaker
 name: "Felipe Rezende"
 photo: "/assets/images/past speakers/Felipe_Rezende.jpg"
-role: "Arquiteto Sênior de Cloud e DevOps · Cloud Architect na SLMIT"
+role: "Arquiteto Sênior de Cloud e DevOps"
 linkedin: "https://www.linkedin.com/in/rezendesfelipe/"
 talks:
   - title: "Quando o SRE vira agente: o que a IA autônoma em produção significa para quem defende infraestrutura"
