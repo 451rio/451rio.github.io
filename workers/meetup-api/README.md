@@ -152,6 +152,39 @@ Comportamento de UX atual:
 - CPF validado no frontend e no backend (estrutura + dígitos verificadores).
 - Recomenda-se adicionar captcha e política de retenção dos dados.
 
+## Lembretes automáticos
+
+Valem para **toda** edição, sem cadastro manual. Quem enfileira é o cron
+(`queueDueReminders`), não uma migração — por isso alcança também quem se
+inscreve depois que a janela já abriu.
+
+- A janela abre `REMINDER_LEAD_DAYS` (5) dias antes do evento, às
+  `REMINDER_SEND_HOUR_UTC` (12:00 UTC = 09:00 em São Paulo).
+- São até 5 levas, uma por dia, do quinto dia antes até a véspera. Cada tick do
+  cron distribui os pendentes em rodízio pelas levas ainda disponíveis.
+- Dividir não é enfeite: a capacidade de uma edição chega perto do teto de 100
+  e-mails/dia, que é compartilhado com confirmação, magic link e cancelamento.
+  Mandando tudo de uma vez, a sobra cai no `deferJobsOverDailyCap`, que desiste
+  após 3 reagendamentos e marca o job como `failed` — gente sem lembrete e sem
+  aviso.
+- "Agora" é sempre a primeira leva. Quem se inscreve faltando dois dias pega as
+  levas que restam; quem se inscreve no dia recebe na hora.
+- Um lembrete por inscrição, garantido por índice único parcial
+  (`idx_email_jobs_one_reminder_per_registration`). Dois ticks sobrepostos não
+  duplicam.
+- Quem cancela some sozinho: o cancelamento apaga a inscrição e o job vai junto
+  por `ON DELETE CASCADE`.
+
+### Texto do lembrete
+
+- Por padrão o Worker monta o corpo a partir de `meetups` (título, data, hora) e
+  aponta para a página da edição no site, que tem endereço e agenda. É o que faz
+  um meetup novo já nascer com lembrete.
+- Para personalizar (agenda no corpo, endereço, recados da edição), insira uma
+  linha em `reminder_templates` com o `meetup_slug`. Existindo, ela vence.
+- Migrações: `0019` (abre `email_jobs.kind` para `reminder` + índice único) e
+  `0020` (tabela `reminder_templates`, já com o texto do meetup de 03/09/2026).
+
 ## E-mails de confirmação
 
 - O e-mail é agendado no momento da inscrição para envio após 10 minutos.

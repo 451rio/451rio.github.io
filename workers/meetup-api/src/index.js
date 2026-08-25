@@ -445,6 +445,16 @@ async function markEmailAsFailed(env, jobId, errorText) {
 const DAILY_EMAIL_CAP = 100;
 const MAX_CAP_RETRIES = 3;
 
+// Lembretes começam a sair REMINDER_LEAD_DAYS dias antes do meetup, uma leva por
+// dia. Dividir importa: a capacidade de uma edição chega perto de DAILY_EMAIL_CAP,
+// e esse teto é compartilhado com confirmação, magic link e cancelamento. Mandar
+// tudo de uma vez estouraria a cota e empurraria a sobra para o caminho de
+// exceção (deferJobsOverDailyCap), que desiste depois de MAX_CAP_RETRIES e marca
+// o job como 'failed' — ou seja, gente sem lembrete e sem aviso.
+const REMINDER_LEAD_DAYS = 5;
+const REMINDER_SEND_HOUR_UTC = 12; // 09:00 em São Paulo
+const REMINDER_BATCH_LIMIT = 200;
+
 async function deferJobsOverDailyCap(env) {
   await env.DB
     .prepare(
@@ -518,6 +528,169 @@ async function processPendingEmailJobs(env, limit = 20) {
     }
   }
 }
+
+function toSqlTimestamp(ms) {
+  // Mesmo formato de CURRENT_TIMESTAMP, que é contra quem `send_after` é comparado.
+  return new Date(ms).toISOString().slice(0, 19).replace("T", " ");
+}
+
+// Momento em que a janela de lembretes abre: REMINDER_LEAD_DAYS dias antes do
+// evento, no horário fixo de envio.
+function reminderWindowOpensAt(eventDate) {
+  const start = Date.parse(String(eventDate || ""));
+  if (!Number.isFinite(start)) return null;
+
+  const day = new Date(start - REMINDER_LEAD_DAYS * 24 * 60 * 60 * 1000);
+  return Date.UTC(
+    day.getUTCFullYear(),
+    day.getUTCMonth(),
+    day.getUTCDate(),
+    REMINDER_SEND_HOUR_UTC
+  );
+}
+
+// As levas ainda disponíveis: uma por dia, do quinto dia antes até a véspera.
+// "Agora" entra sempre como primeira leva — é o que garante lembrete para quem
+// se inscreveu depois da janela já ter aberto. Perto do evento sobra só ela, e o
+// lembrete sai na hora em vez de não sair.
+function reminderSendSlots(eventDate, nowMs) {
+  const start = Date.parse(String(eventDate || ""));
+  if (!Number.isFinite(start)) return [];
+
+  const upcoming = [];
+  for (let daysBefore = REMINDER_LEAD_DAYS; daysBefore >= 1; daysBefore -= 1) {
+    const day = new Date(start - daysBefore * 24 * 60 * 60 * 1000);
+    const slot = Date.UTC(
+      day.getUTCFullYear(),
+      day.getUTCMonth(),
+      day.getUTCDate(),
+      REMINDER_SEND_HOUR_UTC
+    );
+    if (slot > nowMs) upcoming.push(slot);
+  }
+
+  return [nowMs, ...upcoming];
+}
+
+async function getReminderTemplate(db, slug) {
+  return db
+    .prepare("SELECT subject, text_body, html_body FROM reminder_templates WHERE meetup_slug = ?")
+    .bind(slug)
+    .first();
+}
+
+// Lembrete montado só com o que a tabela `meetups` garante ter. É o que faz uma
+// edição nova já nascer com lembrete, sem ninguém cadastrar texto. Endereço e
+// agenda não vivem no banco, então aponta para a página da edição, que tem os
+// dois. Para personalizar, basta uma linha em `reminder_templates`.
+function buildDefaultReminderEmail(env, meetup) {
+  const baseUrl = getSiteBaseUrl(env);
+  const pageUrl = `${baseUrl}/${meetup.slug}/`;
+  const cancelUrl = `${baseUrl}/minhas-inscricoes/`;
+  const weekday = formatWeekday(meetup.event_date);
+  const date = formatMeetupDate(meetup.event_date);
+  const time = formatMeetupTime(meetup.event_date);
+  const title = String(meetup.title || "meetup do Hack in Brasil");
+  const when = weekday ? `${weekday}, ${date}` : date;
+
+  const subject = `Lembrete: ${title}`;
+
+  const text_body = [
+    "Olá,",
+    "",
+    `Passando para lembrar que o ${title} está chegando e que sua inscrição está confirmada.`,
+    "",
+    `Data: ${when}`,
+    time ? `Horário: a partir das ${time}` : "",
+    "",
+    "Agenda, endereço e como chegar estão na página da edição:",
+    pageUrl,
+    "",
+    "Não vai conseguir ir?",
+    "As vagas são limitadas e a sua está reservada. Se você já sabe que não vai, cancele a inscrição para que outra pessoa da comunidade possa ocupar o lugar.",
+    "",
+    `Para cancelar, acesse ${cancelUrl} e peça o link de acesso com o seu e-mail. Não tem senha: o link chega na sua caixa de entrada e abre a sua inscrição.`,
+    "",
+    "Se você vai, não precisa fazer nada. Nos vemos lá!",
+    "",
+    "Abraços,",
+    "Equipe Hack in Brasil"
+  ]
+    .filter((line, index, all) => line !== "" || all[index - 1] !== "")
+    .join("\n");
+
+  const html_body =
+    "<p>Olá,</p>" +
+    `<p>Passando para lembrar que o <strong>${escapeHtml(title)}</strong> está chegando e que sua inscrição está confirmada.</p>` +
+    `<p><strong>Data:</strong> ${escapeHtml(when)}` +
+    (time ? `<br><strong>Horário:</strong> a partir das ${escapeHtml(time)}` : "") +
+    "</p>" +
+    `<p>Agenda, endereço e como chegar estão na <a href="${escapeHtml(pageUrl)}">página da edição</a>.</p>` +
+    "<h3>Não vai conseguir ir?</h3>" +
+    "<p>As vagas são limitadas e a sua está reservada. Se você já sabe que não vai, cancele a inscrição para que outra pessoa da comunidade possa ocupar o lugar.</p>" +
+    `<p>Para cancelar, acesse <a href="${escapeHtml(cancelUrl)}">${escapeHtml(cancelUrl)}</a> e peça o link de acesso com o seu e-mail. Não tem senha: o link chega na sua caixa de entrada e abre a sua inscrição.</p>` +
+    "<p>Se você vai, não precisa fazer nada. Nos vemos lá!</p>" +
+    "<p>Abraços,<br>Equipe Hack in Brasil</p>";
+
+  return {subject, text_body, html_body};
+}
+
+// Enfileira lembretes de toda edição cuja janela já abriu. Roda a cada tick do
+// cron, e não uma vez só, justamente para alcançar quem se inscreveu depois: a
+// consulta pega qualquer inscrição que ainda não tenha lembrete na fila.
+//
+// Quem cancela some daqui sozinho — o cancelamento apaga a inscrição, e o job
+// vai junto por ON DELETE CASCADE.
+async function queueDueReminders(env) {
+  const meetups = await env.DB
+    .prepare("SELECT slug, title, event_date FROM meetups")
+    .all();
+
+  const rows = Array.isArray(meetups.results) ? meetups.results : [];
+  const now = Date.now();
+
+  for (const meetup of rows) {
+    const opensAt = reminderWindowOpensAt(meetup.event_date);
+    if (opensAt === null || now < opensAt) continue;
+    if (isEventPast(meetup.event_date)) continue;
+
+    const pending = await env.DB
+      .prepare(
+        "SELECT id, name, email FROM registrations r WHERE r.meetup_slug = ? AND NOT EXISTS (SELECT 1 FROM email_jobs j WHERE j.registration_id = r.id AND j.kind = 'reminder') ORDER BY r.id ASC LIMIT ?"
+      )
+      .bind(meetup.slug, REMINDER_BATCH_LIMIT)
+      .all();
+
+    const registrations = Array.isArray(pending.results) ? pending.results : [];
+    if (registrations.length === 0) continue;
+
+    const template =
+      (await getReminderTemplate(env.DB, meetup.slug)) || buildDefaultReminderEmail(env, meetup);
+    const slots = reminderSendSlots(meetup.event_date, now);
+
+    // Rodízio pela posição na lista, não pelo id: ids podem vir agrupados
+    // (importação, sequência com buracos) e desequilibrar as levas.
+    await env.DB.batch(
+      registrations.map((registration, index) =>
+        env.DB
+          .prepare(
+            "INSERT OR IGNORE INTO email_jobs (kind, meetup_slug, registration_id, recipient_name, recipient_email, subject, text_body, html_body, send_after, status) VALUES ('reminder', ?, ?, ?, ?, ?, ?, ?, ?, 'pending')"
+          )
+          .bind(
+            meetup.slug,
+            registration.id,
+            registration.name,
+            registration.email,
+            template.subject,
+            template.text_body,
+            template.html_body,
+            toSqlTimestamp(slots[index % slots.length])
+          )
+      )
+    );
+  }
+}
+
 
 function randomInt(maxExclusive) {
   const buf = new Uint32Array(1);
@@ -638,6 +811,25 @@ function formatLongDate(eventDate) {
     day: "numeric",
     month: "long",
     year: "numeric"
+  });
+}
+
+function formatWeekday(eventDate) {
+  const time = Date.parse(String(eventDate || ""));
+  if (!Number.isFinite(time)) return "";
+  return new Date(time).toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    weekday: "long"
+  });
+}
+
+function formatMeetupTime(eventDate) {
+  const time = Date.parse(String(eventDate || ""));
+  if (!Number.isFinite(time)) return "";
+  return new Date(time).toLocaleTimeString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit"
   });
 }
 
@@ -2085,6 +2277,13 @@ export default {
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(
       (async () => {
+        // Antes de processar: assim a primeira leva de lembretes já sai neste
+        // mesmo tick. Isolado em try/catch porque uma falha aqui não pode
+        // impedir o envio do que já está na fila.
+        try {
+          await queueDueReminders(env);
+        } catch {
+        }
         await processPendingEmailJobs(env);
         try {
           await env.DB
