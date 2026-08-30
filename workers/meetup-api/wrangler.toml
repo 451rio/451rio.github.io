@@ -14,6 +14,7 @@ RESEND_FROM_EMAIL = "Hack in Brasil <contato@hackinbrasil.com.br>"
 RESEND_REPLY_TO = "contato@hackinbrasil.com.br"
 SPONSOR_NOTIFY_EMAIL = "contato@hackinbrasil.com.br"
 TALK_NOTIFY_EMAIL = "contato@hackinbrasil.com.br"
+ADMIN_EMAILS = "REPLACE-WITH-YOUR-ADMIN-EMAIL"
 
 [triggers]
 crons = ["*/2 * * * *"]

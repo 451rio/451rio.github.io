@@ -259,6 +259,14 @@ async function hashToken(token) {
   return bytesToBase64(new Uint8Array(digest));
 }
 
+function isAdminEmail(email, env) {
+  const admins = String(env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  return admins.includes(String(email || "").trim().toLowerCase());
+}
+
 function getSiteBaseUrl(env) {
   const configured = String(env.SITE_BASE_URL || "").trim().replace(/\/+$/, "");
   if (configured) return configured;
@@ -873,6 +881,7 @@ async function handleMagicLinkRequest(request, env, corsOrigin, ctx) {
   const body = parsed.body;
 
   const email = String(body.email || "").trim().toLowerCase();
+  const purpose = String(body.purpose || "").trim() === "admin" ? "admin" : "subscriber";
   const captchaId = String(body.captchaId || "");
   const captchaValue = Number(body.captcha);
 
@@ -911,12 +920,17 @@ async function handleMagicLinkRequest(request, env, corsOrigin, ctx) {
       );
     }
 
-    const registrationCount = await env.DB
-      .prepare("SELECT COUNT(*) AS total FROM registrations WHERE email = ?")
-      .bind(email)
-      .first();
+    const authorized =
+      purpose === "admin"
+        ? isAdminEmail(email, env)
+        : Number(
+            (await env.DB
+              .prepare("SELECT COUNT(*) AS total FROM registrations WHERE email = ?")
+              .bind(email)
+              .first())?.total || 0
+          ) > 0;
 
-    if (Number(registrationCount?.total || 0) === 0) {
+    if (!authorized) {
       await env.DB
         .prepare("INSERT INTO auth_login_requests (email_hash) VALUES (?)")
         .bind(emailHash)
@@ -934,7 +948,8 @@ async function handleMagicLinkRequest(request, env, corsOrigin, ctx) {
       .bind(emailHash, email, tokenHash, `+${MAGIC_LINK_TTL_MINUTES} minutes`)
       .run();
 
-    const link = `${getSiteBaseUrl(env)}/minhas-inscricoes/?token=${encodeURIComponent(token)}`;
+    const redirectPath = purpose === "admin" ? "/checkin/" : "/minhas-inscricoes/";
+    const link = `${getSiteBaseUrl(env)}${redirectPath}?token=${encodeURIComponent(token)}`;
     const message = buildMagicLinkEmail(link);
 
     runInBackground(ctx, () =>
@@ -1055,7 +1070,7 @@ async function handleMyRegistrations(env, session, corsOrigin) {
   try {
     rows = await env.DB
       .prepare(
-        "SELECT r.meetup_slug, r.name, r.created_at, m.title, m.event_date, m.duration_minutes, m.xp_reward, c.code AS certificate_code FROM registrations r JOIN meetups m ON m.slug = r.meetup_slug LEFT JOIN certificates c ON c.registration_id = r.id WHERE r.email = ? ORDER BY m.event_date DESC"
+        "SELECT r.meetup_slug, r.name, r.created_at, r.checked_in_at, m.title, m.event_date, m.duration_minutes, m.xp_reward, c.code AS certificate_code FROM registrations r JOIN meetups m ON m.slug = r.meetup_slug LEFT JOIN certificates c ON c.registration_id = r.id WHERE r.email = ? ORDER BY m.event_date DESC"
       )
       .bind(session.email)
       .all();
@@ -1077,8 +1092,9 @@ async function handleMyRegistrations(env, session, corsOrigin) {
       canCancel: !past,
       xpReward: Number(row.xp_reward || 0),
       xpEarned: past ? Number(row.xp_reward || 0) : 0,
+      checkedInAt: row.checked_in_at || null,
       certificate: {
-        available: isCertificateAvailable(availableAt),
+        available: isCertificateAvailable(availableAt) && !!row.checked_in_at,
         availableAt,
         code: row.certificate_code || null
       }
@@ -1206,6 +1222,106 @@ function generateCertificateCode() {
 
 function isCertificateCode(value) {
   return /^HIB-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(value);
+}
+
+function generateCheckinCode() {
+  return `chk_${randomHex(16)}`;
+}
+
+async function handleGetCheckinCode(env, session, slug, corsOrigin) {
+  try {
+    const registration = await env.DB
+      .prepare("SELECT id, checkin_code, checked_in_at FROM registrations WHERE meetup_slug = ? AND email = ?")
+      .bind(slug, session.email)
+      .first();
+
+    if (!registration) {
+      return json({error: "Inscrição não encontrada"}, 404, corsOrigin);
+    }
+
+    if (registration.checkin_code) {
+      return json(
+        {code: registration.checkin_code, checkedIn: !!registration.checked_in_at},
+        200,
+        corsOrigin
+      );
+    }
+
+    await env.DB
+      .prepare("UPDATE registrations SET checkin_code = ? WHERE id = ? AND checkin_code IS NULL")
+      .bind(generateCheckinCode(), registration.id)
+      .run();
+
+    const updated = await env.DB
+      .prepare("SELECT checkin_code, checked_in_at FROM registrations WHERE id = ?")
+      .bind(registration.id)
+      .first();
+
+    if (!updated?.checkin_code) {
+      return serverError(corsOrigin, "me:checkinCode", new Error("checkin_code missing right after insert"));
+    }
+
+    return json(
+      {code: updated.checkin_code, checkedIn: !!updated.checked_in_at},
+      200,
+      corsOrigin
+    );
+  } catch (err) {
+    return serverError(corsOrigin, "me:checkinCode", err);
+  }
+}
+
+async function handleAdminStatus(env, session, corsOrigin) {
+  return json({isAdmin: isAdminEmail(session.email, env)}, 200, corsOrigin);
+}
+
+async function handleAdminCheckin(request, env, session, corsOrigin) {
+  if (!isAdminEmail(session.email, env)) {
+    return json({error: "Acesso restrito à organização."}, 403, corsOrigin);
+  }
+
+  const parsed = await readJsonBody(request, corsOrigin);
+  if (parsed.error) return parsed.error;
+
+  const code = String(parsed.body.code || "").trim();
+  if (!code) {
+    return json({error: "Código de check-in inválido"}, 400, corsOrigin);
+  }
+
+  try {
+    const registration = await env.DB
+      .prepare(
+        "SELECT r.id, r.name, r.checked_in_at, m.title FROM registrations r JOIN meetups m ON m.slug = r.meetup_slug WHERE r.checkin_code = ?"
+      )
+      .bind(code)
+      .first();
+
+    if (!registration) {
+      return json({error: "Código não encontrado. Confira se é o QR certo."}, 404, corsOrigin);
+    }
+
+    const alreadyCheckedIn = !!registration.checked_in_at;
+
+    if (!alreadyCheckedIn) {
+      await env.DB
+        .prepare("UPDATE registrations SET checked_in_at = CURRENT_TIMESTAMP WHERE id = ? AND checked_in_at IS NULL")
+        .bind(registration.id)
+        .run();
+    }
+
+    return json(
+      {
+        ok: true,
+        alreadyCheckedIn,
+        name: registration.name,
+        meetupTitle: registration.title
+      },
+      200,
+      corsOrigin
+    );
+  } catch (err) {
+    return serverError(corsOrigin, "admin:checkin", err);
+  }
 }
 
 function certificateUrl(env, code) {
@@ -1347,12 +1463,20 @@ async function queueCertificateEmail(env, certificate, recipientEmail) {
 async function handleIssueCertificate(env, session, slug, corsOrigin) {
   try {
     const registration = await env.DB
-      .prepare("SELECT id, name FROM registrations WHERE meetup_slug = ? AND email = ?")
+      .prepare("SELECT id, name, checked_in_at FROM registrations WHERE meetup_slug = ? AND email = ?")
       .bind(slug, session.email)
       .first();
 
     if (!registration) {
       return json({error: "Inscrição não encontrada"}, 404, corsOrigin);
+    }
+
+    if (!registration.checked_in_at) {
+      return json(
+        {error: "O certificado só é liberado para quem fez check-in no dia do meetup."},
+        409,
+        corsOrigin
+      );
     }
 
     const meetup = await getMeetupBySlug(env.DB, slug);
@@ -2176,6 +2300,27 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/me/profile") {
         return withSession(request, env, corsOrigin, (session) =>
           handleUpdateProfile(request, env, session, corsOrigin)
+        );
+      }
+
+      const checkinCodeMatch = url.pathname.match(
+        /^\/api\/me\/registrations\/([a-z0-9-]+)\/checkin-code$/
+      );
+      if (request.method === "GET" && checkinCodeMatch) {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleGetCheckinCode(env, session, checkinCodeMatch[1], corsOrigin)
+        );
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/me/admin-status") {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleAdminStatus(env, session, corsOrigin)
+        );
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/admin/checkin") {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleAdminCheckin(request, env, session, corsOrigin)
         );
       }
 
