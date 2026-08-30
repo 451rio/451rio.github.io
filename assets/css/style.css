@@ -21,11 +21,6 @@
   box-sizing: border-box;
 }
 
-/* Regra de autor vence regra do navegador: qualquer `display` declarado aqui
- * (.btn é inline-flex, .certificate-lookup é grid) passa por cima do
- * `display: none` que o atributo `hidden` traz do user agent. Sem isto, os
- * elementos que o JS esconde por `hidden` continuam na tela — era o caso do
- * botão "Tentar novamente" na área de inscrições. */
 [hidden] {
   display: none !important;
 }
@@ -122,7 +117,6 @@ a {
   color: var(--accent);
 }
 
-/* O sublinhado animado do .nav-link ficaria solto por baixo da pílula. */
 .nav-link-account::after {
   display: none;
 }
@@ -1464,8 +1458,6 @@ footer a {
   white-space: nowrap;
 }
 
-/* Pódio: o topo da lista precisa se distinguir de relance, sem virar outra
- * página. */
 .ranking-row.is-top-1 {
   border-color: rgba(244, 215, 77, 0.55);
   background: rgba(244, 215, 77, 0.10);
@@ -1861,6 +1853,16 @@ footer a {
 }
 
 @media (max-width: 720px) {
+  .nav {
+    flex-wrap: wrap;
+    row-gap: 0.6rem;
+  }
+
+  .nav-brand span,
+  .nav-logo-tag {
+    white-space: nowrap;
+  }
+
   .blog-photo-gallery {
     grid-template-columns: 1fr;
   }
@@ -1884,6 +1886,7 @@ footer a {
   }
 
   .nav-right-static {
+    width: 100%;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: .9rem;
@@ -2043,6 +2046,30 @@ footer a {
   .blog-card,
   .blog-article {
     padding: 1.1rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .nav-left {
+    gap: 0.3rem;
+  }
+
+  .nav-brand {
+    gap: 0.4rem;
+  }
+
+  .nav-logo {
+    width: 24px;
+    height: 24px;
+  }
+
+  .nav-brand span {
+    font-size: 0.95rem;
+  }
+
+  .nav-logo-tag {
+    font-size: 0.7rem;
+    padding: 0.12rem 0.5rem;
   }
 }
 

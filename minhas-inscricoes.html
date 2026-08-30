@@ -60,11 +60,6 @@ sitemap: false
     <form id="profile-form" class="registration-form">
       <div class="registration-field registration-field-full">
         <label for="profile-nickname">Apelido no ranking</label>
-        {%- comment -%}
-          Sem `maxlength`: o navegador cortaria um apelido colado sem avisar, que
-          é justamente o silêncio que se quer evitar aqui. O limite é checado no
-          JS e de novo no Worker.
-        {%- endcomment -%}
         <input id="profile-nickname" class="registration-input" type="text" name="nickname"
                placeholder="Ex.: n0ct4mbul4" autocomplete="off" autocorrect="off"
                spellcheck="false" aria-describedby="profile-nickname-help" required>

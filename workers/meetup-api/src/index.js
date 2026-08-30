@@ -8,17 +8,12 @@ function json(data, status = 200, corsOrigin = "*") {
       "access-control-allow-origin": corsOrigin,
       "access-control-allow-methods": "GET,POST,OPTIONS",
       "access-control-allow-headers": "content-type,authorization",
-      // Responses carry personal data and are origin-dependent: never let a
-      // browser or intermediary keep or share a copy.
       "cache-control": "no-store",
       vary: "Origin"
     }
   });
 }
 
-// Work that must not delay (or leak its duration into) the response. Sending
-// an e-mail only when an account exists is exactly the kind of timing
-// difference that turns a deliberately generic answer into an oracle.
 function runInBackground(ctx, task) {
   const promise = Promise.resolve()
     .then(task)
@@ -59,8 +54,6 @@ async function readJsonBody(request, corsOrigin) {
     return {error: json({error: "Invalid JSON body"}, 400, corsOrigin)};
   }
 
-  // `null`, arrays and scalars are valid JSON but every handler reads fields
-  // off this value — without the guard they throw and surface as a 500.
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     return {error: json({error: "Invalid JSON body"}, 400, corsOrigin)};
   }
@@ -83,8 +76,6 @@ function getCorsOrigin(request, env) {
 function isValidEmail(email) {
   if (typeof email !== "string") return false;
   if (email.length < 6 || email.length > 254) return false;
-  // Espaço era o único caractere barrado, então "a\n@b.com" passava. Controle e
-  // CR/LF são o que transforma um endereço em injeção de cabeçalho mais adiante.
   if (/[\s\u0000-\u001F\u007F]/.test(email)) return false;
 
   const atIndex = email.indexOf("@");
@@ -160,8 +151,6 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
-// Erros do provedor de e-mail costumam ecoar o endereço que falhou, e esse texto
-// vai parar em email_jobs.last_error, que nunca é purgado.
 function redactEmails(text) {
   return text.replace(/[^\s@,;:<>"']+@[^\s@,;:<>"']+\.[^\s@,;:<>"']+/g, "[e-mail removido]");
 }
@@ -399,16 +388,12 @@ async function sendEmailWithResend(env, job) {
     throw new Error(message);
   }
 
-  // Registra o que saiu de fato. Envio imediato (magic link, cancelamento,
-  // patrocínio, palestra) também gasta a cota do provedor: se não entrasse
-  // aqui, o limite diário estaria medindo só uma parte do que foi enviado.
   try {
     await env.DB
       .prepare("INSERT INTO email_sends (kind) VALUES (?)")
       .bind(String(job.kind || "transactional"))
       .run();
   } catch (error) {
-    // Perder a linha do livro não pode desfazer um e-mail que já saiu.
     console.error("[email:ledger]", error);
   }
 
@@ -445,14 +430,8 @@ async function markEmailAsFailed(env, jobId, errorText) {
 const DAILY_EMAIL_CAP = 100;
 const MAX_CAP_RETRIES = 3;
 
-// Lembretes começam a sair REMINDER_LEAD_DAYS dias antes do meetup, uma leva por
-// dia. Dividir importa: a capacidade de uma edição chega perto de DAILY_EMAIL_CAP,
-// e esse teto é compartilhado com confirmação, magic link e cancelamento. Mandar
-// tudo de uma vez estouraria a cota e empurraria a sobra para o caminho de
-// exceção (deferJobsOverDailyCap), que desiste depois de MAX_CAP_RETRIES e marca
-// o job como 'failed' — ou seja, gente sem lembrete e sem aviso.
 const REMINDER_LEAD_DAYS = 5;
-const REMINDER_SEND_HOUR_UTC = 12; // 09:00 em São Paulo
+const REMINDER_SEND_HOUR_UTC = 12;
 const REMINDER_BATCH_LIMIT = 200;
 
 async function deferJobsOverDailyCap(env) {
@@ -508,9 +487,6 @@ async function processPendingEmailJobs(env, limit = 20) {
     const currentAttempt = Number(job.attempts || 0) + 1;
 
     try {
-      // O PDF não é guardado no banco: é remontado a partir da linha do
-      // certificado na hora do envio. Assim a fila não carrega 95 KB por job e
-      // o documento sai sempre igual ao que a consulta pública confirma.
       if (job.kind === "certificate") {
         job.attachments = await buildCertificateAttachment(env, job.certificate_code);
       }
@@ -530,12 +506,9 @@ async function processPendingEmailJobs(env, limit = 20) {
 }
 
 function toSqlTimestamp(ms) {
-  // Mesmo formato de CURRENT_TIMESTAMP, que é contra quem `send_after` é comparado.
   return new Date(ms).toISOString().slice(0, 19).replace("T", " ");
 }
 
-// Momento em que a janela de lembretes abre: REMINDER_LEAD_DAYS dias antes do
-// evento, no horário fixo de envio.
 function reminderWindowOpensAt(eventDate) {
   const start = Date.parse(String(eventDate || ""));
   if (!Number.isFinite(start)) return null;
@@ -549,10 +522,6 @@ function reminderWindowOpensAt(eventDate) {
   );
 }
 
-// As levas ainda disponíveis: uma por dia, do quinto dia antes até a véspera.
-// "Agora" entra sempre como primeira leva — é o que garante lembrete para quem
-// se inscreveu depois da janela já ter aberto. Perto do evento sobra só ela, e o
-// lembrete sai na hora em vez de não sair.
 function reminderSendSlots(eventDate, nowMs) {
   const start = Date.parse(String(eventDate || ""));
   if (!Number.isFinite(start)) return [];
@@ -579,10 +548,6 @@ async function getReminderTemplate(db, slug) {
     .first();
 }
 
-// Lembrete montado só com o que a tabela `meetups` garante ter. É o que faz uma
-// edição nova já nascer com lembrete, sem ninguém cadastrar texto. Endereço e
-// agenda não vivem no banco, então aponta para a página da edição, que tem os
-// dois. Para personalizar, basta uma linha em `reminder_templates`.
 function buildDefaultReminderEmail(env, meetup) {
   const baseUrl = getSiteBaseUrl(env);
   const pageUrl = `${baseUrl}/${meetup.slug}/`;
@@ -635,12 +600,6 @@ function buildDefaultReminderEmail(env, meetup) {
   return {subject, text_body, html_body};
 }
 
-// Enfileira lembretes de toda edição cuja janela já abriu. Roda a cada tick do
-// cron, e não uma vez só, justamente para alcançar quem se inscreveu depois: a
-// consulta pega qualquer inscrição que ainda não tenha lembrete na fila.
-//
-// Quem cancela some daqui sozinho — o cancelamento apaga a inscrição, e o job
-// vai junto por ON DELETE CASCADE.
 async function queueDueReminders(env) {
   const meetups = await env.DB
     .prepare("SELECT slug, title, event_date FROM meetups")
@@ -668,8 +627,6 @@ async function queueDueReminders(env) {
       (await getReminderTemplate(env.DB, meetup.slug)) || buildDefaultReminderEmail(env, meetup);
     const slots = reminderSendSlots(meetup.event_date, now);
 
-    // Rodízio pela posição na lista, não pelo id: ids podem vir agrupados
-    // (importação, sequência com buracos) e desequilibrar as levas.
     await env.DB.batch(
       registrations.map((registration, index) =>
         env.DB
@@ -763,14 +720,10 @@ const MAGIC_LINK_MAX_PER_WINDOW = 3;
 const SESSION_TTL_MINUTES = 30;
 const CANCEL_CONFIRMATION_WORD = "CANCELAR";
 const CERTIFICATE_DELAY_HOURS = 24;
-// Sem I, O, 0 e 1: o código é lido em voz alta e digitado a partir de um PDF
-// impresso. 32 símbolos também dividem 256 exatamente, então o sorteio byte a
-// byte abaixo fica uniforme.
 const CERTIFICATE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const RANKING_LIMIT = 100;
 const NICKNAME_MIN_LENGTH = 3;
 const NICKNAME_MAX_LENGTH = 24;
-// Apelidos que fariam alguém passar por organização no ranking público.
 const RESERVED_NICKNAMES = [
   "hackinbrasil",
   "organizador",
@@ -973,8 +926,6 @@ async function handleMagicLinkRequest(request, env, corsOrigin, ctx) {
     const link = `${getSiteBaseUrl(env)}/minhas-inscricoes/?token=${encodeURIComponent(token)}`;
     const message = buildMagicLinkEmail(link);
 
-    // Deliberately not awaited: the caller must not be able to tell the two
-    // branches apart by how long the answer took.
     runInBackground(ctx, () =>
       sendEmailWithResend(env, {
         recipient_email: email,
@@ -1123,8 +1074,6 @@ async function handleMyRegistrations(env, session, corsOrigin) {
     };
   });
 
-  // What the person came here to act on goes first: upcoming meetups with the
-  // nearest one on top, then past editions most recent first.
   registrations.sort((a, b) => {
     if (a.isPast !== b.isPast) return a.isPast ? 1 : -1;
     const aTime = Date.parse(a.eventDate) || 0;
@@ -1185,12 +1134,6 @@ async function handleCancelRegistration(request, env, session, slug, corsOrigin,
       );
     }
 
-    // One batch, one transaction. The seat count is recomputed from the
-    // registrations table instead of being decremented: that is idempotent, so
-    // a double submit can never give two seats back, and it repairs any drift
-    // the counter may already carry. Do not gate this on `meta.changes` — D1
-    // counts cascaded deletes there too (an `email_jobs` row cascades from the
-    // registration), so the value is not a reliable "did I delete one row".
     await env.DB.batch([
       env.DB
         .prepare("DELETE FROM email_jobs WHERE registration_id = ? AND status IN ('pending', 'processing')")
@@ -1208,8 +1151,6 @@ async function handleCancelRegistration(request, env, session, slug, corsOrigin,
         .bind(slug)
     ]);
 
-    // The seat is already free at this point, so the confirmation e-mail must
-    // not keep the person waiting on a third-party round-trip.
     const notice = buildCancellationEmail(String(meetup.title), meetup.event_date);
     runInBackground(ctx, () =>
       sendEmailWithResend(env, {
@@ -1230,9 +1171,6 @@ async function handleCancelRegistration(request, env, session, slug, corsOrigin,
   }
 }
 
-// Um certificado de presença não pode sair enquanto o evento ainda está
-// acontecendo, e a margem de 24h depois do fim é a regra combinada com a
-// organização. `duration_minutes` é o que diz quando o meetup terminou.
 function certificateAvailableAt(meetup) {
   const start = Date.parse(String(meetup?.event_date || ""));
   if (!Number.isFinite(start)) return null;
@@ -1263,10 +1201,6 @@ function certificateUrl(env, code) {
   return `${getSiteBaseUrl(env)}/certificado/?codigo=${encodeURIComponent(code)}`;
 }
 
-// A consulta pública confirma o documento sem entregar quem é a pessoa: nome
-// só aparece no PDF, que chega pelo e-mail da inscrição. Quem já tem o
-// certificado em mãos consegue conferir edição, carga horária e emissão; quem
-// só tem o código não descobre nada sobre ninguém.
 function buildPublicCertificatePayload(row) {
   return {
     code: row.code,
@@ -1362,8 +1296,6 @@ async function buildCertificateAttachment(env, code) {
   ];
 }
 
-// Quanto ainda cabe hoje. Serve só para a mensagem ser honesta sobre quando o
-// e-mail deve chegar — quem decide de fato é o cron.
 async function remainingEmailsToday(env) {
   const row = await env.DB
     .prepare("SELECT COUNT(*) AS total FROM email_sends WHERE date(sent_at) = date('now')")
@@ -1372,8 +1304,6 @@ async function remainingEmailsToday(env) {
 }
 
 async function queueCertificateEmail(env, certificate, recipientEmail) {
-  // Dois cliques seguidos não podem virar dois e-mails: se já existe job em
-  // aberto para este certificado, ele é o envio.
   const pending = await env.DB
     .prepare(
       "SELECT id FROM email_jobs WHERE kind = 'certificate' AND certificate_code = ? AND status IN ('pending', 'processing')"
@@ -1429,8 +1359,6 @@ async function handleIssueCertificate(env, session, slug, corsOrigin) {
       );
     }
 
-    // Emitir de novo devolve o mesmo documento: o código já pode estar impresso,
-    // arquivado ou enviado para um RH.
     let certificate = await findCertificateByRegistration(env, registration.id);
 
     if (!certificate) {
@@ -1447,8 +1375,6 @@ async function handleIssueCertificate(env, session, slug, corsOrigin) {
         )
         .run();
 
-      // Relê em vez de confiar no INSERT: dois cliques simultâneos fazem um dos
-      // dois cair no DO NOTHING, e os dois precisam receber o mesmo código.
       certificate = await findCertificateByRegistration(env, registration.id);
     }
 
@@ -1460,9 +1386,6 @@ async function handleIssueCertificate(env, session, slug, corsOrigin) {
       );
     }
 
-    // Vai para a mesma fila dos e-mails de confirmação, em vez de sair na hora:
-    // é o que mantém o teto de 100 envios por dia honesto. O cron pega daqui a
-    // no máximo dois minutos, e o que não couber hoje sai amanhã de manhã.
     const queued = await queueCertificateEmail(env, certificate, session.email);
     const remaining = await remainingEmailsToday(env);
 
@@ -1486,9 +1409,6 @@ async function handleIssueCertificate(env, session, slug, corsOrigin) {
   }
 }
 
-// Endpoint público: é assim que um RH ou uma faculdade confere um certificado
-// que recebeu. Responde apenas a quem tem o código — 60 bits sorteados, impressos
-// no próprio documento — e nunca devolve e-mail, CPF ou telefone.
 async function handleCertificateLookup(env, rawCode, corsOrigin) {
   const code = String(rawCode || "").trim().toUpperCase();
   const notFound = json({error: "Certificado não encontrado"}, 404, corsOrigin);
@@ -1512,20 +1432,13 @@ async function handleCertificateLookup(env, rawCode, corsOrigin) {
   return json({valid: true, certificate: buildPublicCertificatePayload(row)}, 200, corsOrigin);
 }
 
-// Só pontua meetup que já terminou: estar inscrito no próximo não é
-// participação. É a mesma leitura de "acabou" que o certificado usa.
 const ENDED_MEETUP_CONDITION =
   "datetime(m.event_date, '+' || m.duration_minutes || ' minutes') <= datetime('now')";
 
 function normalizeNickname(value) {
-  // Sem corte no limite: apelido maior que o máximo tem que virar erro. Cortar
-  // em silêncio gravaria um apelido diferente do que a pessoa digitou, e ela só
-  // descobriria ao se ver no ranking com outro nome.
   return String(value || "").trim().replace(/\s+/g, " ");
 }
 
-// Acento e caixa não distinguem apelidos: "Ana", "ana" e "Aná" são a mesma
-// pessoa aos olhos de quem lê a lista.
 function nicknameKey(nickname) {
   return String(nickname || "")
     .normalize("NFD")
@@ -1535,14 +1448,9 @@ function nicknameKey(nickname) {
 
 function isValidNickname(nickname) {
   if (nickname.length < NICKNAME_MIN_LENGTH || nickname.length > NICKNAME_MAX_LENGTH) return false;
-  // Começa e termina com letra ou número; no meio aceita espaço, ponto, hífen
-  // e underscore. Sem emoji, sem controle, sem RTL override.
   return /^[\p{L}\p{N}][\p{L}\p{N} ._-]*[\p{L}\p{N}]$/u.test(nickname);
 }
 
-// Palavra inteira, não pedaço. Casar por substring recusava apelido legítimo:
-// "Gustaff" batia em `staff`, "adminstrador" batia em `admin`. A forma compacta
-// entra à parte para pegar "Hack In Brasil" escrito com espaço, ponto ou hífen.
 function isReservedNickname(nickname) {
   const key = nicknameKey(nickname);
 
@@ -1628,8 +1536,6 @@ async function handleUpdateProfile(request, env, session, corsOrigin) {
       .bind(session.email, nickname, nicknameKey(nickname), isPublic ? 1 : 0)
       .run();
   } catch (err) {
-    // O ON CONFLICT acima resolve só a colisão por e-mail; a de apelido chega
-    // aqui como violação de UNIQUE.
     if (String(err?.message || err || "").includes("UNIQUE constraint failed")) {
       return json({error: "Esse apelido já está em uso. Escolha outro."}, 409, corsOrigin);
     }
@@ -1656,8 +1562,6 @@ async function handleUpdateProfile(request, env, session, corsOrigin) {
   );
 }
 
-// Público e anônimo por construção: apelido e XP, nada mais. Nem e-mail, nem
-// nome, nem em quais meetups a pessoa esteve.
 async function handleRanking(env, corsOrigin) {
   let rows;
   try {
@@ -2185,10 +2089,6 @@ export default {
             "access-control-allow-origin": corsOrigin,
             "access-control-allow-methods": "GET,POST,OPTIONS",
             "access-control-allow-headers": "content-type,authorization",
-            // This answer is origin-specific: without Vary an intermediary
-            // cache could hand one origin's allow-origin header to another.
-            // Preflights carry no personal data, so they may be cached — an
-            // hour of it saves a round-trip before every POST.
             vary: "Origin",
             "access-control-max-age": "3600"
           }
@@ -2277,9 +2177,6 @@ export default {
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(
       (async () => {
-        // Antes de processar: assim a primeira leva de lembretes já sai neste
-        // mesmo tick. Isolado em try/catch porque uma falha aqui não pode
-        // impedir o envio do que já está na fila.
         try {
           await queueDueReminders(env);
         } catch {

@@ -1,6 +1,3 @@
-# Lookup table used to render relations between the dedicated pages
-# (sponsors / speakers / supporters) and the meetups they took part in.
-# Add an entry here whenever a meetup gets its own page.
 - slug: meetup-13-12-2023
   title: "Meetup Hack in Brasil — 13/12/2023"
   local: "Impulso"
