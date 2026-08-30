@@ -9,6 +9,6 @@
     "d1:seed": "wrangler d1 execute meetup_db --file=./migrations/0001_schema.sql"
   },
   "devDependencies": {
-    "wrangler": "^4.124.0"
+    "wrangler": "^4.126.0"
   }
 }
