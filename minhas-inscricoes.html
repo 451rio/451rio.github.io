@@ -14,9 +14,10 @@ sitemap: false
     <p class="hero-kicker">Área de participante</p>
     <h1 class="meetup-title">Minhas inscrições</h1>
     <p class="meetup-subtitle">
-      Veja os meetups em que você está inscrito, emita o certificado dos que já aconteceram e
-      cancele sua vaga se não puder comparecer — assim outra pessoa da comunidade pode ocupá-la.
-      O acesso é feito por um link enviado para o seu e-mail, sem senha.
+      Veja os meetups em que você está inscrito, gere seu QR code de check-in para o dia do evento,
+      emita o certificado dos que já aconteceram e cancele sua vaga se não puder comparecer — assim
+      outra pessoa da comunidade pode ocupá-la. O acesso é feito por um link enviado para o seu
+      e-mail, sem senha.
     </p>
   </section>
 
@@ -90,6 +91,18 @@ sitemap: false
   </section>
 </main>
 
+<div class="modal" id="checkinModal" aria-hidden="true">
+  <div class="modal-content modal-content--feedback">
+    <button class="modal-close" data-close aria-label="Fechar">✕</button>
+    <h3 id="checkin-modal-title" class="registration-feedback-title">QR code de check-in</h3>
+    <p id="checkin-modal-message" class="registration-feedback-message">
+      Mostre este QR code na entrada do meetup para confirmar sua presença. Ele é necessário para
+      liberar o certificado de participação depois do evento.
+    </p>
+    <div id="checkin-qr-container" class="checkin-qr"></div>
+  </div>
+</div>
+
 <div class="modal" id="cancelModal" aria-hidden="true">
   <div class="modal-content modal-content--feedback">
     <button class="modal-close" data-close aria-label="Fechar">✕</button>
@@ -116,5 +129,6 @@ sitemap: false
   </div>
 </div>
 
+<script src="{{ '/assets/js/vendor/qrcode.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/form-utils.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/meetup-subscriptions.js' | relative_url }}"></script>

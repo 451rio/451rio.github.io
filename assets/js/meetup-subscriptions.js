@@ -29,6 +29,9 @@
   const accountEmail = document.getElementById("account-email");
   const logoutButton = document.getElementById("logout-button");
 
+  const checkinModal = document.getElementById("checkinModal");
+  const checkinQrContainer = document.getElementById("checkin-qr-container");
+
   const cancelModal = document.getElementById("cancelModal");
   const cancelForm = document.getElementById("cancel-form");
   const cancelMessage = document.getElementById("cancel-modal-message");
@@ -46,6 +49,7 @@
     profileSection, profileSummary, profileForm, profileNickname, profilePublic, profileSubmit,
     profileNicknameHelp,
     listSection, list, accountEmail, logoutButton,
+    checkinModal, checkinQrContainer,
     cancelModal, cancelForm, cancelMessage, cancelInput, cancelSubmit, cancelWordLabel,
     feedbackModal, feedbackTitle, feedbackMessage
   ];
@@ -242,6 +246,13 @@
       main.append(xpBadge);
     }
 
+    if (registration.checkedInAt) {
+      const checkinBadge = document.createElement("span");
+      checkinBadge.className = "subscription-badge is-checkin";
+      checkinBadge.textContent = "Check-in confirmado";
+      main.append(checkinBadge);
+    }
+
     const title = document.createElement("h3");
     title.textContent = registration.title || registration.meetupSlug;
     main.append(title);
@@ -269,6 +280,15 @@
     const certificate = registration.certificate || {};
 
     if (registration.canCancel) {
+      const checkinButton = document.createElement("button");
+      checkinButton.type = "button";
+      checkinButton.className = "btn btn-ghost";
+      checkinButton.textContent = "Gerar QR code de check-in";
+      checkinButton.addEventListener("click", function () {
+        openCheckinModal(registration);
+      });
+      actions.append(checkinButton);
+
       const cancelButton = document.createElement("button");
       cancelButton.type = "button";
       cancelButton.className = "btn btn-danger";
@@ -293,9 +313,13 @@
     } else {
       const note = document.createElement("p");
       note.className = "subscription-note";
-      note.textContent = certificate.availableAt
-        ? `Certificado disponível a partir de ${formatEventDateTime(certificate.availableAt)}.`
-        : "Evento encerrado — não é mais possível cancelar.";
+      if (!registration.checkedInAt) {
+        note.textContent = "Certificado indisponível: não identificamos check-in confirmado no dia do meetup.";
+      } else {
+        note.textContent = certificate.availableAt
+          ? `Certificado disponível a partir de ${formatEventDateTime(certificate.availableAt)}.`
+          : "Evento encerrado — não é mais possível cancelar.";
+      }
       actions.append(note);
     }
 
@@ -384,6 +408,96 @@
     renderProfile(data.profile);
     renderList(Array.isArray(data.registrations) ? data.registrations : []);
     showOnly(listSection);
+  }
+
+  const CHECKIN_POLL_INTERVAL_MS = 3000;
+  let checkinPollId = null;
+
+  function stopCheckinPolling() {
+    if (checkinPollId !== null) {
+      window.clearInterval(checkinPollId);
+      checkinPollId = null;
+    }
+  }
+
+  function showCheckinError(message) {
+    checkinQrContainer.innerHTML = "";
+    const errorMessage = document.createElement("p");
+    errorMessage.className = "registration-help is-error";
+    errorMessage.textContent = message;
+    checkinQrContainer.append(errorMessage);
+  }
+
+  function showCheckinSuccess() {
+    stopCheckinPolling();
+    checkinQrContainer.innerHTML = "";
+    const success = document.createElement("p");
+    success.className = "checkin-success";
+    success.textContent = "✓ Check-in confirmado!";
+    checkinQrContainer.append(success);
+  }
+
+  async function pollCheckinStatus(slug) {
+    if (!checkinModal.classList.contains("open")) {
+      stopCheckinPolling();
+      return;
+    }
+
+    try {
+      const { response, data } = await apiFetch(
+        `/api/me/registrations/${slug}/checkin-code`,
+        { method: "GET" }
+      );
+      if (response.ok && data.checkedIn) showCheckinSuccess();
+    } catch {
+    }
+  }
+
+  async function openCheckinModal(registration) {
+    stopCheckinPolling();
+    checkinQrContainer.innerHTML = "";
+    const loadingMessage = document.createElement("p");
+    loadingMessage.className = "registration-help";
+    loadingMessage.textContent = "Gerando QR code...";
+    checkinQrContainer.append(loadingMessage);
+    checkinModal.classList.add("open");
+
+    if (typeof window.qrcode !== "function") {
+      showCheckinError("Não foi possível carregar o gerador de QR code. Recarregue a página.");
+      return;
+    }
+
+    let response;
+    let data;
+    try {
+      ({ response, data } = await apiFetch(
+        `/api/me/registrations/${registration.meetupSlug}/checkin-code`,
+        { method: "GET" }
+      ));
+    } catch {
+      showCheckinError("Erro de conexão. Tente novamente.");
+      return;
+    }
+
+    if (!response.ok || !data.code) {
+      showCheckinError(data.error || "Não foi possível gerar o QR code agora.");
+      return;
+    }
+
+    if (data.checkedIn) {
+      showCheckinSuccess();
+      return;
+    }
+
+    const qr = window.qrcode(0, "M");
+    qr.addData(data.code);
+    qr.make();
+    checkinQrContainer.innerHTML = qr.createSvgTag(8, 16);
+
+    checkinPollId = window.setInterval(
+      () => pollCheckinStatus(registration.meetupSlug),
+      CHECKIN_POLL_INTERVAL_MS
+    );
   }
 
   function closeCancelModal() {
