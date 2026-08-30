@@ -12,6 +12,9 @@
     {%- if include.back_label %}
     <a class="nav-link" href="{{ nav_back_url | relative_url }}">{{ include.back_label }}</a>
     {%- endif %}
+    {%- unless page.url == '/ranking/' %}
+    <a class="nav-link" href="{{ '/ranking/' | relative_url }}">Ranking</a>
+    {%- endunless %}
     {%- unless page.url == '/minhas-inscricoes/' %}
     <a class="nav-link nav-link-account" href="{{ '/minhas-inscricoes/' | relative_url }}">Minha conta</a>
     {%- endunless %}

@@ -52,9 +52,7 @@ permalink: /quero-patrocinar/
         <textarea id="sponsor-message" class="registration-input registration-textarea" name="message" rows="4" maxlength="2000" placeholder="Conte um pouco sobre o interesse da empresa em patrocinar (opcional)."></textarea>
       </div>
       <div class="registration-field registration-field-full">
-        <label for="sponsor-captcha">Verificação: quanto é <span id="sponsor-captcha-question"></span>?</label>
-        <input id="sponsor-captcha" class="registration-input" type="text" name="captcha" inputmode="numeric" autocomplete="off" placeholder="Resultado" required>
-        <small class="registration-help">Resolva a operação para confirmar que você não é um robô.</small>
+        <p class="registration-help" id="sponsor-captcha-status" role="status" aria-live="polite">Verificação de segurança: preparando...</p>
       </div>
       <div class="registration-actions">
         <button class="btn btn-primary" type="submit" id="sponsor-submit">

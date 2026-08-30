@@ -7,8 +7,7 @@
   const feedbackMessage = document.getElementById("registration-feedback-message");
   const cpfInput = document.getElementById("reg-document");
   const cpfHelp = document.getElementById("cpf-help");
-  const captchaInput = document.getElementById("reg-captcha");
-  const captchaQuestion = document.getElementById("captcha-question");
+  const captchaStatus = document.getElementById("reg-captcha-status");
   const phoneInput = document.getElementById("reg-phone");
   const phoneHelp = document.getElementById("phone-help");
 
@@ -24,7 +23,7 @@
     success: "Inscrição confirmada",
     error: "Não foi possível concluir"
   });
-  const captcha = F.createCaptcha(captchaQuestion, captchaInput, apiBase);
+  const captcha = F.createCaptcha(apiBase, captchaStatus);
 
   function isMeetupPast() {
     if (!meetupDate) return false;
@@ -79,8 +78,7 @@
     "e-mail": form.querySelector('[name="email"]'),
     "celular": phoneInput,
     "documento": cpfInput,
-    "verificação": captchaInput,
-    "pergunta de verificação": captchaQuestion,
+    "verificação": captchaStatus,
     "consentimento LGPD": form.querySelector('[name="consentLgpd"]')
   };
   const missingControls = Object.keys(requiredControls).filter((label) => !requiredControls[label]);
@@ -200,7 +198,7 @@
     setPhoneErrorState(false);
 
     if (!captcha.ready()) {
-      feedback.show("Resolva a verificação antes de enviar.", "error");
+      feedback.show("Aguarde a verificação de segurança terminar e tente novamente.", "error");
       captcha.render();
       return;
     }

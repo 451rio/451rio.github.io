@@ -649,54 +649,63 @@ async function queueDueReminders(env) {
 }
 
 
-function randomInt(maxExclusive) {
-  const buf = new Uint32Array(1);
+function randomHex(byteLength) {
+  const buf = new Uint8Array(byteLength);
   crypto.getRandomValues(buf);
-  return buf[0] % maxExclusive;
+  return Array.from(buf, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function generateCaptchaChallenge() {
-  const a = randomInt(9) + 1;
-  const b = randomInt(9) + 1;
-  const isAddition = randomInt(2) === 0;
-  let left = a;
-  let right = b;
-  if (!isAddition && left < right) {
-    const temp = left;
-    left = right;
-    right = temp;
+const POW_DIFFICULTY_BITS = 14;
+const POW_CHALLENGE_TTL_MINUTES = 5;
+const POW_MIN_SOLVE_SECONDS = 1;
+
+function powLeadingZeroBits(bytes) {
+  let count = 0;
+  for (const byte of bytes) {
+    if (byte === 0) {
+      count += 8;
+      continue;
+    }
+    for (let bit = 7; bit >= 0; bit -= 1) {
+      if ((byte >> bit) & 1) return count;
+      count += 1;
+    }
   }
-  const answer = isAddition ? left + right : left - right;
-  const question = `${left} ${isAddition ? "+" : "−"} ${right}`;
-  return {question, answer};
+  return count;
+}
+
+async function powSatisfies(seed, nonce, difficulty) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${seed}:${nonce}`));
+  return powLeadingZeroBits(new Uint8Array(digest)) >= difficulty;
 }
 
 async function handleCaptchaIssue(env, corsOrigin) {
-  const {question, answer} = generateCaptchaChallenge();
   const id = crypto.randomUUID();
+  const seed = randomHex(16);
 
   try {
     await env.DB
       .prepare(
-        "INSERT INTO captcha_challenges (id, answer, expires_at) VALUES (?, ?, datetime('now', '+10 minutes'))"
+        `INSERT INTO captcha_challenges (id, seed, difficulty, expires_at) VALUES (?, ?, ?, datetime('now', '+${POW_CHALLENGE_TTL_MINUTES} minutes'))`
       )
-      .bind(id, answer)
+      .bind(id, seed, POW_DIFFICULTY_BITS)
       .run();
   } catch (err) {
     return serverError(corsOrigin, "captcha:issue", err);
   }
 
-  return json({id, question}, 200, corsOrigin);
+  return json({id, seed, difficulty: POW_DIFFICULTY_BITS}, 200, corsOrigin);
 }
 
-async function consumeCaptcha(env, id, answer) {
-  if (typeof id !== "string" || !id || !Number.isFinite(answer)) return false;
+async function consumeCaptcha(env, id, nonce) {
+  if (typeof id !== "string" || !id) return false;
+  if (!Number.isSafeInteger(nonce) || nonce < 0) return false;
 
   let consumed;
   try {
     consumed = await env.DB
       .prepare(
-        "UPDATE captcha_challenges SET consumed = 1 WHERE id = ? AND consumed = 0 AND expires_at > CURRENT_TIMESTAMP"
+        `UPDATE captcha_challenges SET consumed = 1 WHERE id = ? AND consumed = 0 AND expires_at > CURRENT_TIMESTAMP AND created_at <= datetime('now', '-${POW_MIN_SOLVE_SECONDS} seconds')`
       )
       .bind(id)
       .run();
@@ -707,11 +716,13 @@ async function consumeCaptcha(env, id, answer) {
   if (!consumed.meta || consumed.meta.changes !== 1) return false;
 
   const row = await env.DB
-    .prepare("SELECT answer FROM captcha_challenges WHERE id = ?")
+    .prepare("SELECT seed, difficulty FROM captcha_challenges WHERE id = ?")
     .bind(id)
     .first();
 
-  return !!row && Number(row.answer) === answer;
+  if (!row) return false;
+
+  return powSatisfies(String(row.seed), nonce, Number(row.difficulty));
 }
 
 const MAGIC_LINK_TTL_MINUTES = 15;

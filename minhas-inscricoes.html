@@ -38,9 +38,7 @@ sitemap: false
         <small class="registration-help">Use o mesmo e-mail informado na inscrição do meetup.</small>
       </div>
       <div class="registration-field registration-field-full">
-        <label for="login-captcha">Verificação: quanto é <span id="login-captcha-question"></span>?</label>
-        <input id="login-captcha" class="registration-input" type="text" name="captcha" inputmode="numeric" autocomplete="off" placeholder="Resultado" required>
-        <small class="registration-help">Resolva a operação para confirmar que você não é um robô.</small>
+        <p class="registration-help" id="login-captcha-status" role="status" aria-live="polite">Verificação de segurança: preparando...</p>
       </div>
       <div class="registration-actions">
         <button class="btn btn-primary" type="submit" id="magic-link-submit">Receber link de acesso</button>

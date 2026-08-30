@@ -14,8 +14,7 @@
   const loginForm = document.getElementById("magic-link-form");
   const loginEmail = document.getElementById("login-email");
   const loginSubmit = document.getElementById("magic-link-submit");
-  const captchaQuestion = document.getElementById("login-captcha-question");
-  const captchaInput = document.getElementById("login-captcha");
+  const captchaStatus = document.getElementById("login-captcha-status");
 
   const profileSection = document.getElementById("profile-section");
   const profileSummary = document.getElementById("profile-summary");
@@ -43,7 +42,7 @@
 
   const requiredNodes = [
     loadingSection, loadingStatus, retryButton,
-    loginSection, loginStatus, loginForm, loginEmail, loginSubmit, captchaQuestion, captchaInput,
+    loginSection, loginStatus, loginForm, loginEmail, loginSubmit, captchaStatus,
     profileSection, profileSummary, profileForm, profileNickname, profilePublic, profileSubmit,
     profileNicknameHelp,
     listSection, list, accountEmail, logoutButton,
@@ -56,7 +55,7 @@
     success: "Tudo certo",
     error: "Não foi possível concluir"
   });
-  const captcha = F.createCaptcha(captchaQuestion, captchaInput, apiBase);
+  const captcha = F.createCaptcha(apiBase, captchaStatus);
 
   const SESSION_KEY = "hib.subscriptions.session";
   const SESSION_EXPIRED_MESSAGE =
@@ -559,7 +558,7 @@
     if (!email) return;
 
     if (!captcha.ready()) {
-      feedback.show("Resolva a verificação antes de enviar.", "error");
+      feedback.show("Aguarde a verificação de segurança terminar e tente novamente.", "error");
       captcha.render();
       return;
     }
