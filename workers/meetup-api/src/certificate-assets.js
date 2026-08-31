@@ -1,19 +1,3 @@
-// GERADO — não edite à mão.
-//
-// Assets binários do certificado em PDF, embutidos para o Worker não depender de
-// rede na hora de emitir. Como regenerar está em docs/meetup-subscriptions.md.
-//
-// SIGNATURES: a faixa de assinaturas (nomes em Herr Von Muellerhoff, rótulos em
-// DM Mono e as linhas) rasterizada a 300dpi e reduzida a 1 bit por pixel. Entra
-// no PDF como /ImageMask, então são 223 KB de bitmap que o Flate
-// leva a 8 KB.
-//
-// SEAL: o logo já composto sobre o cinza da faixa (#e4e4e4), o que dispensa
-// canal alfa e SMask no PDF.
-//
-// WIDTHS: larguras dos glifos das Helvetica base-14, indexadas pelo byte
-// WinAnsi — é o que permite centralizar, alinhar à direita e justificar texto.
-
 export const SIGNATURES = {
   width: 3508,
   height: 521,

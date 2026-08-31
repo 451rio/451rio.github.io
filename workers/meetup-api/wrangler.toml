@@ -17,7 +17,3 @@ TALK_NOTIFY_EMAIL = "contato@hackinbrasil.com.br"
 
 [triggers]
 crons = ["*/2 * * * *"]
-
-# Required secrets (set with `wrangler secret put`):
-# DOC_ENCRYPTION_KEY_BASE64
-# RESEND_API_KEY

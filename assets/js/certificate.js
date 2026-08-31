@@ -21,8 +21,6 @@
   const required = [form, input, submit, status, result].concat(Object.values(fields));
   if (required.some((node) => !node)) return;
 
-  // O número é sorteado em blocos de 4, mas ninguém deveria precisar acertar os
-  // hífens: aceita com ou sem separador, em qualquer caixa.
   function normalizeCode(value) {
     const raw = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
     const body = raw.startsWith("HIB") ? raw.slice(3) : raw;
@@ -30,8 +28,6 @@
     return `HIB-${body.slice(0, 4)}-${body.slice(4, 8)}-${body.slice(8, 12)}`;
   }
 
-  // D1 devolve CURRENT_TIMESTAMP como "YYYY-MM-DD HH:MM:SS" em UTC, sem fuso.
-  // Date.parse leria isso como horário local e mudaria a data de emissão.
   function parseTimestamp(value) {
     const text = String(value || "").trim();
     if (!text) return NaN;
@@ -138,7 +134,6 @@
     return;
   }
 
-  // Link com o número já preenchido (o e-mail manda um assim) consulta sozinho.
   const params = new URLSearchParams(window.location.search);
   const requested = normalizeCode(params.get("codigo") || params.get("code") || "");
   if (requested) {

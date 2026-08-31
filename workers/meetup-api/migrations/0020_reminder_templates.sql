@@ -1,11 +1,3 @@
--- Texto opcional de lembrete por meetup.
---
--- O Worker sabe montar um lembrete sozinho a partir de `meetups` (título, data,
--- horário) — é isso que faz o lembrete valer para todo meetup novo sem ninguém
--- precisar cadastrar nada. Esta tabela é só o override: quando existe linha
--- para o slug, ela vence, e é onde entra o que o Worker não tem como saber
--- (endereço, agenda, recados da edição).
-
 CREATE TABLE IF NOT EXISTS reminder_templates (
   meetup_slug TEXT PRIMARY KEY,
   subject TEXT NOT NULL,
@@ -16,7 +8,6 @@ CREATE TABLE IF NOT EXISTS reminder_templates (
   FOREIGN KEY (meetup_slug) REFERENCES meetups(slug) ON DELETE CASCADE
 );
 
--- Edição de 03/09/2026: tem agenda fechada e endereço, então ganha texto próprio.
 INSERT OR IGNORE INTO reminder_templates (meetup_slug, subject, text_body, html_body)
 VALUES (
   'meetup-03-09-2026',

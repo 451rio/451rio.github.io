@@ -26,7 +26,7 @@ permalink: /meetup-03-09-2026/
       </article>
 
       <article class="talk-card">
-        <p class="talk-time">19:05</p>
+        <p class="talk-time">19:15</p>
         <div class="talk-layout">
           <div class="talk-content">
             <h3>Principais defesas contra ataques ciberfísicos em subestações elétricas</h3>
@@ -50,30 +50,7 @@ permalink: /meetup-03-09-2026/
       </article>
 
       <article class="talk-card">
-        <p class="talk-time">19:40</p>
-        <div class="talk-layout">
-          <div class="talk-content">
-            <h3>Harvest now, decrypt later: migrando TLS para o mundo pós-quântico na prática</h3>
-            <p>Computadores quânticos ainda não quebram RSA, mas adversários já capturam tráfego cifrado hoje para decifrar no futuro, a estratégia "harvest now, decrypt later". Nesta palestra, Ney López apresenta uma jornada experimental de migração para criptografia pós-quântica: dissecação do handshake do TLS 1.3 com capturas reais de tráfego, montagem de uma PKI local com certificados digitais e validação de um handshake híbrido combinando algoritmos clássicos com ML-KEM (padrão NIST), utilizando OpenSSL 3.x e OQS Provider. Tudo com ferramentas open-source que podem ser reproduzidas em casa. O público vai sair entendendo por que a transição pós-quântica já começou, como funciona um handshake híbrido na prática e por onde começar a mapear as dependências criptográficas dos seus sistemas (crypto-agility).</p>
-          </div>
-          <aside class="talk-speaker">
-            <a class="talk-speaker-link" href="{{ '/palestrantes/ney-lopez/' | relative_url }}" aria-label="Ver perfil de Ney López">
-              <img src="{{ '/assets/images/past speakers/Ney_Lopez.jpg' | replace: ' ', '%20' | relative_url }}" alt="Foto de Ney López">
-              <h4>Ney López</h4>
-              <p class="speaker-role">Pesquisador em criptografia pós-quântica no SENAI CIMATEC e Diretor de Consultoria em Cibersegurança na Century Data.</p>
-            </a>
-          </aside>
-        </div>
-      </article>
-
-      <article class="talk-card">
-        <p class="talk-time">20:15</p>
-        <h3>Coffee break</h3>
-        <p>Pausa para networking, troca de ideias e conexão entre participantes.</p>
-      </article>
-
-      <article class="talk-card">
-        <p class="talk-time">20:30</p>
+        <p class="talk-time">19:50</p>
         <div class="talk-layout">
           <div class="talk-content">
             <h3>Quando o SRE vira agente: o que a IA autônoma em produção significa para quem defende infraestrutura</h3>
@@ -89,7 +66,13 @@ permalink: /meetup-03-09-2026/
       </article>
 
       <article class="talk-card">
-        <p class="talk-time">21:05</p>
+        <p class="talk-time">20:25</p>
+        <h3>Coffee break</h3>
+        <p>Pausa para networking, troca de ideias e conexão entre participantes.</p>
+      </article>
+
+      <article class="talk-card">
+        <p class="talk-time">20:55</p>
         <div class="talk-layout">
           <div class="talk-content">
             <h3>Alertas demais, sinal de menos</h3>
@@ -106,7 +89,7 @@ permalink: /meetup-03-09-2026/
       </article>
 
       <article class="talk-card">
-        <p class="talk-time">21:40</p>
+        <p class="talk-time">21:30</p>
         <h3>Encerramento &amp; sorteios</h3>
         <p>Agradecimentos finais, sorteios e fechamento das atividades às 21h50.</p>
       </article>
@@ -139,9 +122,7 @@ permalink: /meetup-03-09-2026/
         <small id="cpf-help" class="registration-help">Apenas CPF válido será aceito.</small>
       </div>
       <div class="registration-field registration-field-full">
-        <label for="reg-captcha">Verificação: quanto é <span id="captcha-question"></span>?</label>
-        <input id="reg-captcha" class="registration-input" type="text" name="captcha" inputmode="numeric" autocomplete="off" placeholder="Resultado" required>
-        <small class="registration-help">Resolva a operação para confirmar que você não é um robô.</small>
+        <p class="registration-help" id="reg-captcha-status" role="status" aria-live="polite">Verificação de segurança: preparando...</p>
       </div>
       <label class="registration-consent">
         <input type="checkbox" name="consentLgpd" required>
