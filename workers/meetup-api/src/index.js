@@ -1232,11 +1232,19 @@ function isCertificateAvailable(availableAt) {
 }
 
 function generateCertificateCode() {
-  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  const alphabetLength = CERTIFICATE_CODE_ALPHABET.length;
+  const maxUnbiased = Math.floor(256 / alphabetLength) * alphabetLength;
   let chars = "";
-  for (const byte of bytes) {
-    chars += CERTIFICATE_CODE_ALPHABET[byte % CERTIFICATE_CODE_ALPHABET.length];
+
+  while (chars.length < 12) {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    for (const byte of bytes) {
+      if (byte >= maxUnbiased) continue;
+      chars += CERTIFICATE_CODE_ALPHABET[byte % alphabetLength];
+      if (chars.length === 12) break;
+    }
   }
+
   return `HIB-${chars.slice(0, 4)}-${chars.slice(4, 8)}-${chars.slice(8, 12)}`;
 }
 
