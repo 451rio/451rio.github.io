@@ -1,16 +1,3 @@
-/* Self-hosted webfonts.
- *
- * Space Grotesk and DM Mono are licensed under the SIL Open Font License 1.1,
- * which permits redistribution — see assets/fonts/OFL.txt.
- *
- * They are served from this origin on purpose. Loading them from Google sent
- * every visitor's IP and User-Agent to a third party on every page view, and
- * made a cross-origin request from /minhas-inscricoes/ while the single-use
- * access token was still in the URL. Please do not move these back to a CDN.
- *
- * Generated from the Google Fonts css2 API, latin + latin-ext subsets only.
- */
-
 @font-face {
   font-family: 'DM Mono';
   font-style: normal;

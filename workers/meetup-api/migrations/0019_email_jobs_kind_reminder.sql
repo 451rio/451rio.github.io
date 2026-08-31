@@ -1,14 +1,3 @@
--- Abre `email_jobs.kind` para lembretes de meetup.
---
--- `kind` só aceitava 'confirmation' e 'certificate'. Um lembrete não é nenhum
--- dos dois, e `email_sends` grava esse mesmo rótulo no livro-caixa que mede o
--- limite diário — vale distinguir. SQLite não altera CHECK no lugar; a tabela é
--- reconstruída, como já foi feito em 0004 e 0017.
---
--- Quem enfileira os lembretes é o cron do Worker (`queueDueReminders`), não uma
--- migração: eles precisam alcançar também quem se inscreve depois, em todos os
--- meetups. Esta migração só abre espaço no schema.
-
 DROP TABLE IF EXISTS email_jobs_new;
 
 CREATE TABLE email_jobs_new (
@@ -56,19 +45,11 @@ ALTER TABLE email_jobs_new RENAME TO email_jobs;
 CREATE INDEX IF NOT EXISTS idx_email_jobs_status_send_after
 ON email_jobs(status, send_after);
 
--- Usado pelo cancelamento (DELETE ... WHERE registration_id = ?) e pela busca de
--- quem ainda não tem lembrete na fila. É também o que impede o lembrete de
--- sair para quem desistiu.
 CREATE INDEX IF NOT EXISTS idx_email_jobs_registration_id
 ON email_jobs(registration_id);
 
 CREATE INDEX IF NOT EXISTS idx_email_jobs_certificate_code
 ON email_jobs(certificate_code) WHERE certificate_code IS NOT NULL;
 
--- No máximo um lembrete por inscrição. O cron enfileira em lote a cada 2
--- minutos; sem isto, dois ticks sobrepostos poderiam mandar o mesmo lembrete
--- duas vezes para a mesma pessoa. Parcial de propósito: único em
--- `registration_id` inteiro não serve, já que a mesma inscrição tem confirmação
--- e lembrete — foi por isso que 0017 não recriou o índice único de 0002.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_email_jobs_one_reminder_per_registration
 ON email_jobs(registration_id) WHERE kind = 'reminder';

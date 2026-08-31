@@ -119,10 +119,14 @@ npx wrangler d1 migrations apply meetup_db --remote
 ```bash
 npx wrangler secret put DOC_ENCRYPTION_KEY_BASE64
 npx wrangler secret put RESEND_API_KEY
+npx wrangler secret put ADMIN_EMAILS
 ```
 
 `DOC_ENCRYPTION_KEY_BASE64` deve ser uma chave AES-256 em Base64 (32 bytes).
 `RESEND_API_KEY` é a chave privada da API do Resend.
+`ADMIN_EMAILS` é a lista de e-mails com acesso à área de check-in (`/checkin/`), separados por
+vírgula caso haja mais de um. Fica como secret (e não em `[vars]`) porque este repositório é
+público — nunca vai para o `wrangler.toml`.
 
 5. Deploy:
 

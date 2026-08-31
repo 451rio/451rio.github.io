@@ -1,14 +1,3 @@
-// Gerador do certificado em PDF.
-//
-// Escreve o PDF na mão, sem biblioteca: são poucos recursos (um retângulo com
-// degradê, duas imagens e texto em Helvetica) e qualquer dependência de
-// renderização de página exigiria o Browser Rendering, que é plano pago.
-//
-// O layout espelha o que a página HTML mostrava — A4 paisagem, faixa oliva em
-// cima, faixa clara com as assinaturas embaixo — e as medidas continuam
-// expressas em "cqw" (1% da largura da folha), como no CSS original, para os
-// dois desenhos não divergirem.
-
 import {
   SIGNATURES,
   SEAL,
@@ -35,8 +24,6 @@ const FONT_MONO = "F3";
 
 const encoder = new TextEncoder();
 
-// A Helvetica base-14 fala WinAnsi, que cobre todo o português. O que não
-// couber vira "?" — melhor um caractere errado do que um PDF corrompido.
 const CP1252_HIGH = new Map([
   [0x20ac, 0x80], [0x201a, 0x82], [0x0192, 0x83], [0x201e, 0x84], [0x2026, 0x85],
   [0x2020, 0x86], [0x2021, 0x87], [0x02c6, 0x88], [0x2030, 0x89], [0x0160, 0x8a],
@@ -63,7 +50,6 @@ function widthsFor(font) {
   return font === FONT_BOLD ? HELVETICA_BOLD_WIDTHS : HELVETICA_WIDTHS;
 }
 
-// Courier é monoespaçada: 600/1000 para todo glifo.
 function measure(text, font, size, letterSpacing = 0) {
   const bytes = toWinAnsi(text);
   const gaps = Math.max(0, bytes.length - 1) * letterSpacing;
@@ -115,8 +101,6 @@ class Content {
     this.parts.push(line);
   }
 
-  // `justify` distribui a sobra entre os espaços via Tw, que é como o PDF
-  // justifica texto: o operador soma largura a cada byte 0x20.
   text(value, {font, size, x, y, color = "1 1 1", letterSpacing = 0, wordSpacing = 0}) {
     this.push("BT");
     this.push(`${color} rg`);
@@ -153,8 +137,6 @@ function assemble(objects) {
   const pushText = (text) => pushBytes(encoder.encode(text));
 
   pushText("%PDF-1.4\n");
-  // Comentário binário: sinaliza a leitores e a servidores que o arquivo não é
-  // texto puro e não deve sofrer conversão de fim de linha.
   pushBytes(new Uint8Array([0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a]));
 
   const offsets = [];
@@ -186,8 +168,6 @@ function assemble(objects) {
   return file;
 }
 
-// Blocos empilhados na vertical, medidos antes de desenhar para o conjunto
-// poder ser centralizado no espaço oliva — o mesmo que o flexbox fazia.
 function layoutBlocks(certificate) {
   const blocks = [];
 
@@ -301,8 +281,6 @@ function drawBlocks(content, blocks, topY) {
         const isLast = index === block.lines.length - 1;
         const value = words.join(" ");
         const natural = measure(value, block.font, block.size);
-        // A última linha de um parágrafo não é esticada: justificá-la abriria
-        // buracos entre as palavras.
         const spaces = words.length - 1;
         const wordSpacing = !isLast && spaces > 0 ? (TEXT_WIDTH - natural) / spaces : 0;
 
@@ -340,26 +318,22 @@ function drawBlocks(content, blocks, topY) {
 export function buildCertificatePdf(certificate) {
   const content = new Content();
 
-  // Fundo oliva: degradê axial no sentido do gradiente de 135° do CSS.
   content.push("q");
   content.push(`0 ${BAND_HEIGHT.toFixed(2)} ${PAGE_WIDTH.toFixed(2)} ${(PAGE_HEIGHT - BAND_HEIGHT).toFixed(2)} re W n`);
   content.push("/Sh0 sh");
   content.push("Q");
 
-  // Faixa clara das assinaturas.
   content.push("q");
   content.push("0.894 0.894 0.894 rg");
   content.push(`0 0 ${PAGE_WIDTH.toFixed(2)} ${BAND_HEIGHT.toFixed(2)} re f`);
   content.push("Q");
 
-  // Assinaturas: stencil 1 bit pintado de preto.
   content.push("q");
   content.push("0.1 0.1 0.1 rg");
   content.push(`${PAGE_WIDTH.toFixed(2)} 0 0 ${BAND_HEIGHT.toFixed(2)} 0 0 cm`);
   content.push("/ImSig Do");
   content.push("Q");
 
-  // Selo centralizado na faixa.
   const sealWidth = 10 * CQW;
   const sealHeight = (sealWidth * SEAL.height) / SEAL.width;
   const sealX = (PAGE_WIDTH - sealWidth) / 2;
@@ -382,33 +356,32 @@ export function buildCertificatePdf(certificate) {
   const objects = [];
   const ref = (index) => `${index} 0 R`;
 
-  objects.push({dict: "<< /Type /Catalog /Pages 2 0 R >>"}); // 1
-  objects.push({dict: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"}); // 2
+  objects.push({dict: "<< /Type /Catalog /Pages 2 0 R >>"});
+  objects.push({dict: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"});
   objects.push({
     dict:
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH.toFixed(2)} ${PAGE_HEIGHT.toFixed(2)}] ` +
       `/Resources << /Font << /${FONT_REGULAR} 5 0 R /${FONT_BOLD} 6 0 R /${FONT_MONO} 7 0 R >> ` +
       "/XObject << /ImSig 8 0 R /ImSeal 9 0 R >> /Shading << /Sh0 10 0 R >> >> /Contents 4 0 R >>"
-  }); // 3
-  objects.push({dict: `<< /Length ${contentBytes.length} >>`, stream: contentBytes}); // 4
+  });
+  objects.push({dict: `<< /Length ${contentBytes.length} >>`, stream: contentBytes});
   objects.push({
     dict: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
-  }); // 5
+  });
   objects.push({
     dict: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
-  }); // 6
+  });
   objects.push({
     dict: "<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>"
-  }); // 7
+  });
 
   const signatureBytes = deflateFromBase64(SIGNATURES.deflate);
   objects.push({
     dict:
       `<< /Type /XObject /Subtype /Image /Width ${SIGNATURES.width} /Height ${SIGNATURES.height} ` +
-      // Decode invertido: no stencil, bit 1 é tinta.
       `/ImageMask true /Decode [1 0] /BitsPerComponent 1 /Filter /FlateDecode /Length ${signatureBytes.length} >>`,
     stream: signatureBytes
-  }); // 8
+  });
 
   const sealBytes = deflateFromBase64(SEAL.deflate);
   objects.push({
@@ -416,31 +389,31 @@ export function buildCertificatePdf(certificate) {
       `<< /Type /XObject /Subtype /Image /Width ${SEAL.width} /Height ${SEAL.height} ` +
       `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${sealBytes.length} >>`,
     stream: sealBytes
-  }); // 9
+  });
 
   objects.push({
     dict:
       "<< /ShadingType 2 /ColorSpace /DeviceRGB " +
       `/Coords [0 ${PAGE_HEIGHT.toFixed(2)} ${PAGE_WIDTH.toFixed(2)} ${BAND_HEIGHT.toFixed(2)}] ` +
       "/Function 11 0 R /Extend [true true] >>"
-  }); // 10
+  });
 
   objects.push({
     dict:
       "<< /FunctionType 3 /Domain [0 1] /Functions [12 0 R 13 0 R] /Bounds [0.46] /Encode [0 1 0 1] >>"
-  }); // 11
+  });
   objects.push({
     dict:
       "<< /FunctionType 2 /Domain [0 1] /C0 [0.4902 0.4471 0.1608] /C1 [0.4196 0.3804 0.1412] /N 1 >>"
-  }); // 12
+  });
   objects.push({
     dict:
       "<< /FunctionType 2 /Domain [0 1] /C0 [0.4196 0.3804 0.1412] /C1 [0.3412 0.3059 0.1137] /N 1 >>"
-  }); // 13
+  });
 
   objects.push({
     dict: `<< /Producer (Hack in Brasil) /Title ${pdfString(`Certificado ${certificate.code}`)} >>`
-  }); // 14
+  });
 
   return assemble(objects);
 }
