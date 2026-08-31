@@ -50,23 +50,61 @@ window.HIBForms = (function () {
     return secondDigit === Number(cpf[10]);
   }
 
-  function createCaptcha(questionEl, inputEl, apiBase) {
+  function powLeadingZeroBits(bytes) {
+    let count = 0;
+    for (const byte of bytes) {
+      if (byte === 0) {
+        count += 8;
+        continue;
+      }
+      for (let bit = 7; bit >= 0; bit -= 1) {
+        if ((byte >> bit) & 1) return count;
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  async function solvePow(seed, difficulty) {
+    const encoder = new TextEncoder();
+    for (let nonce = 0; ; nonce += 1) {
+      const digest = await crypto.subtle.digest("SHA-256", encoder.encode(`${seed}:${nonce}`));
+      if (powLeadingZeroBits(new Uint8Array(digest)) >= difficulty) return nonce;
+    }
+  }
+
+  function createCaptcha(apiBase, statusEl) {
     const base = String(apiBase || "").replace(/\/$/, "");
     let token = null;
+    let nonce = null;
+
+    function setStatus(text) {
+      if (statusEl) statusEl.textContent = text;
+    }
 
     async function render() {
       token = null;
-      if (inputEl) inputEl.value = "";
-      if (questionEl) questionEl.textContent = "…";
+      nonce = null;
+      setStatus("Verificação de segurança: preparando...");
       try {
         const res = await fetch(`${base}/api/captcha`);
         if (!res.ok) throw new Error("captcha");
         const data = await res.json();
-        token = typeof data.id === "string" && data.id ? data.id : null;
-        if (questionEl) questionEl.textContent = String(data.question || "");
+        const id = typeof data.id === "string" && data.id ? data.id : null;
+        const seed = typeof data.seed === "string" && data.seed ? data.seed : null;
+        const difficulty = Number(data.difficulty);
+        if (!id || !seed || !Number.isFinite(difficulty)) throw new Error("captcha");
+
+        setStatus("Verificação de segurança: processando...");
+        const solvedNonce = await solvePow(seed, difficulty);
+
+        token = id;
+        nonce = solvedNonce;
+        setStatus("Verificação de segurança concluída.");
       } catch {
         token = null;
-        if (questionEl) questionEl.textContent = "indisponível";
+        nonce = null;
+        setStatus("Verificação de segurança indisponível. Tente novamente em instantes.");
       }
     }
 
@@ -75,11 +113,11 @@ window.HIBForms = (function () {
     }
 
     function getAnswer() {
-      return inputEl ? inputEl.value.trim() : "";
+      return nonce === null ? "" : String(nonce);
     }
 
     function ready() {
-      return !!token && getAnswer() !== "";
+      return token !== null && nonce !== null;
     }
 
     return { render, getToken, getAnswer, ready };

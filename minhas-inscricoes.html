@@ -14,9 +14,10 @@ sitemap: false
     <p class="hero-kicker">Área de participante</p>
     <h1 class="meetup-title">Minhas inscrições</h1>
     <p class="meetup-subtitle">
-      Veja os meetups em que você está inscrito, emita o certificado dos que já aconteceram e
-      cancele sua vaga se não puder comparecer — assim outra pessoa da comunidade pode ocupá-la.
-      O acesso é feito por um link enviado para o seu e-mail, sem senha.
+      Veja os meetups em que você está inscrito, gere seu QR code de check-in para o dia do evento,
+      emita o certificado dos que já aconteceram e cancele sua vaga se não puder comparecer — assim
+      outra pessoa da comunidade pode ocupá-la. O acesso é feito por um link enviado para o seu
+      e-mail, sem senha.
     </p>
   </section>
 
@@ -38,9 +39,7 @@ sitemap: false
         <small class="registration-help">Use o mesmo e-mail informado na inscrição do meetup.</small>
       </div>
       <div class="registration-field registration-field-full">
-        <label for="login-captcha">Verificação: quanto é <span id="login-captcha-question"></span>?</label>
-        <input id="login-captcha" class="registration-input" type="text" name="captcha" inputmode="numeric" autocomplete="off" placeholder="Resultado" required>
-        <small class="registration-help">Resolva a operação para confirmar que você não é um robô.</small>
+        <p class="registration-help" id="login-captcha-status" role="status" aria-live="polite">Verificação de segurança: preparando...</p>
       </div>
       <div class="registration-actions">
         <button class="btn btn-primary" type="submit" id="magic-link-submit">Receber link de acesso</button>
@@ -60,11 +59,6 @@ sitemap: false
     <form id="profile-form" class="registration-form">
       <div class="registration-field registration-field-full">
         <label for="profile-nickname">Apelido no ranking</label>
-        {%- comment -%}
-          Sem `maxlength`: o navegador cortaria um apelido colado sem avisar, que
-          é justamente o silêncio que se quer evitar aqui. O limite é checado no
-          JS e de novo no Worker.
-        {%- endcomment -%}
         <input id="profile-nickname" class="registration-input" type="text" name="nickname"
                placeholder="Ex.: n0ct4mbul4" autocomplete="off" autocorrect="off"
                spellcheck="false" aria-describedby="profile-nickname-help" required>
@@ -97,6 +91,18 @@ sitemap: false
   </section>
 </main>
 
+<div class="modal" id="checkinModal" aria-hidden="true">
+  <div class="modal-content modal-content--feedback">
+    <button class="modal-close" data-close aria-label="Fechar">✕</button>
+    <h3 id="checkin-modal-title" class="registration-feedback-title">QR code de check-in</h3>
+    <p id="checkin-modal-message" class="registration-feedback-message">
+      Mostre este QR code na entrada do meetup para confirmar sua presença. Ele é necessário para
+      liberar o certificado de participação depois do evento.
+    </p>
+    <div id="checkin-qr-container" class="checkin-qr"></div>
+  </div>
+</div>
+
 <div class="modal" id="cancelModal" aria-hidden="true">
   <div class="modal-content modal-content--feedback">
     <button class="modal-close" data-close aria-label="Fechar">✕</button>
@@ -123,5 +129,6 @@ sitemap: false
   </div>
 </div>
 
+<script src="{{ '/assets/js/vendor/qrcode.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/form-utils.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/meetup-subscriptions.js' | relative_url }}"></script>

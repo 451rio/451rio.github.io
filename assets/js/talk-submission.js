@@ -6,8 +6,7 @@
   const feedbackMessage = document.getElementById("talk-feedback-message");
   const phoneInput = document.getElementById("talk-phone");
   const phoneHelp = document.getElementById("talk-phone-help");
-  const captchaInput = document.getElementById("talk-captcha");
-  const captchaQuestion = document.getElementById("talk-captcha-question");
+  const captchaStatus = document.getElementById("talk-captcha-status");
 
   if (!form || !submit || !feedbackModal || !feedbackTitle || !feedbackMessage) return;
   if (!window.HIBForms) return;
@@ -20,7 +19,7 @@
     success: "Proposta enviada",
     error: "Não foi possível enviar"
   });
-  const captcha = F.createCaptcha(captchaQuestion, captchaInput, apiBase);
+  const captcha = F.createCaptcha(apiBase, captchaStatus);
 
   if (!apiBase || apiBase.includes("REPLACE-WITH-YOUR-WORKER-DOMAIN")) {
     submit.disabled = true;
@@ -38,8 +37,7 @@
     "disponibilidade presencial": form.querySelector('[name="inPerson"]'),
     "uso de imagem": form.querySelector('[name="imageConsent"]'),
     "ciência das orientações": form.querySelector('[name="termsAck"]'),
-    "verificação": captchaInput,
-    "pergunta de verificação": captchaQuestion
+    "verificação": captchaStatus
   };
   const missingControls = Object.keys(requiredControls).filter((label) => !requiredControls[label]);
   if (missingControls.length > 0) {
@@ -110,7 +108,7 @@
     }
 
     if (!captcha.ready()) {
-      feedback.show("Resolva a verificação antes de enviar.", "error");
+      feedback.show("Aguarde a verificação de segurança terminar e tente novamente.", "error");
       captcha.render();
       return;
     }
