@@ -435,6 +435,7 @@
     success.className = "checkin-success";
     success.textContent = "✓ Check-in confirmado!";
     checkinQrContainer.append(success);
+    if (window.HIBFlash) window.HIBFlash.show("✓ Check-in confirmado!", "success", 3000);
   }
 
   async function pollCheckinStatus(slug) {

@@ -623,7 +623,7 @@ async function queueDueReminders(env) {
 
     const pending = await env.DB
       .prepare(
-        "SELECT id, name, email FROM registrations r WHERE r.meetup_slug = ? AND NOT EXISTS (SELECT 1 FROM email_jobs j WHERE j.registration_id = r.id AND j.kind = 'reminder') ORDER BY r.id ASC LIMIT ?"
+        "SELECT id, name, email, created_at FROM registrations r WHERE r.meetup_slug = ? AND NOT EXISTS (SELECT 1 FROM email_jobs j WHERE j.registration_id = r.id AND j.kind = 'reminder') ORDER BY r.id ASC LIMIT ?"
       )
       .bind(meetup.slug, REMINDER_BATCH_LIMIT)
       .all();
@@ -634,10 +634,30 @@ async function queueDueReminders(env) {
     const template =
       (await getReminderTemplate(env.DB, meetup.slug)) || buildDefaultReminderEmail(env, meetup);
     const slots = reminderSendSlots(meetup.event_date, now);
+    const lastSlotIndex = slots.length - 1;
+
+    const earlyAlreadyQueued = await env.DB
+      .prepare(
+        "SELECT COUNT(*) AS total FROM email_jobs j JOIN registrations r ON r.id = j.registration_id WHERE j.meetup_slug = ? AND j.kind = 'reminder' AND r.created_at < ?"
+      )
+      .bind(meetup.slug, toSqlTimestamp(opensAt))
+      .first();
+    let rotatingIndex = Number(earlyAlreadyQueued?.total || 0);
 
     await env.DB.batch(
-      registrations.map((registration, index) =>
-        env.DB
+      registrations.map((registration) => {
+        const registeredAt = Date.parse(`${String(registration.created_at).replace(" ", "T")}Z`);
+        const isLateJoiner = !Number.isFinite(registeredAt) || registeredAt >= opensAt;
+
+        let slotIndex;
+        if (isLateJoiner) {
+          slotIndex = lastSlotIndex;
+        } else {
+          slotIndex = rotatingIndex % slots.length;
+          rotatingIndex += 1;
+        }
+
+        return env.DB
           .prepare(
             "INSERT OR IGNORE INTO email_jobs (kind, meetup_slug, registration_id, recipient_name, recipient_email, subject, text_body, html_body, send_after, status) VALUES ('reminder', ?, ?, ?, ?, ?, ?, ?, ?, 'pending')"
           )
@@ -649,9 +669,9 @@ async function queueDueReminders(env) {
             template.subject,
             template.text_body,
             template.html_body,
-            toSqlTimestamp(slots[index % slots.length])
-          )
-      )
+            toSqlTimestamp(slots[slotIndex])
+          );
+      })
     );
   }
 }
@@ -663,7 +683,7 @@ function randomHex(byteLength) {
   return Array.from(buf, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-const POW_DIFFICULTY_BITS = 14;
+const POW_DIFFICULTY_BITS = 10;
 const POW_CHALLENGE_TTL_MINUTES = 5;
 const POW_MIN_SOLVE_SECONDS = 1;
 
@@ -1900,7 +1920,7 @@ async function handleRegister(request, env, slug, corsOrigin) {
         subject: String(emailTemplate.subject),
         html: String(emailTemplate.html_body),
         text: String(emailTemplate.text_body),
-        delayMinutes: 10
+        delayMinutes: 0
       });
     }
   } catch {

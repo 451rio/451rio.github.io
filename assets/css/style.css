@@ -2224,3 +2224,42 @@ footer a {
   background: rgba(255, 143, 143, 0.14);
   color: #ff9f9f;
 }
+
+.flash-message {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  font-size: clamp(1.3rem, 4vw, 2.1rem);
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: pre-line;
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+  pointer-events: none;
+}
+
+.flash-message.is-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.flash-message.is-success {
+  background: #0f5c4c;
+  color: #ffffff;
+}
+
+.flash-message.is-error {
+  background: #5c1414;
+  color: #ffffff;
+}
+
+.flash-message.is-info {
+  background: rgba(11, 20, 26, 0.94);
+  color: var(--text-main);
+}

@@ -67,9 +67,22 @@ window.HIBForms = (function () {
 
   async function solvePow(seed, difficulty) {
     const encoder = new TextEncoder();
-    for (let nonce = 0; ; nonce += 1) {
-      const digest = await crypto.subtle.digest("SHA-256", encoder.encode(`${seed}:${nonce}`));
-      if (powLeadingZeroBits(new Uint8Array(digest)) >= difficulty) return nonce;
+    const BATCH_SIZE = 32;
+
+    for (let base = 0; ; base += BATCH_SIZE) {
+      const attempts = [];
+      for (let i = 0; i < BATCH_SIZE; i += 1) {
+        const nonce = base + i;
+        attempts.push(
+          crypto.subtle
+            .digest("SHA-256", encoder.encode(`${seed}:${nonce}`))
+            .then((digest) => ({ nonce, bits: powLeadingZeroBits(new Uint8Array(digest)) }))
+        );
+      }
+
+      const results = await Promise.all(attempts);
+      const solved = results.find((result) => result.bits >= difficulty);
+      if (solved) return solved.nonce;
     }
   }
 

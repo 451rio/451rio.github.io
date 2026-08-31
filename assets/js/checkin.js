@@ -93,9 +93,12 @@
   let stream = null;
   let lastCode = "";
   let lastCodeAt = 0;
+  let busy = false;
+  const FLASH_DURATION_MS = 3000;
 
   function stopScanning() {
     scanning = false;
+    busy = false;
     if (scanIntervalId !== null) {
       window.clearInterval(scanIntervalId);
       scanIntervalId = null;
@@ -105,6 +108,7 @@
       stream = null;
     }
     video.srcObject = null;
+    if (window.HIBFlash) window.HIBFlash.hide();
   }
 
   function showResult(message, kind) {
@@ -112,11 +116,27 @@
     resultContainer.className = `checkin-result${kind ? ` is-${kind}` : ""}`;
   }
 
+  function flashAndResume(message, type) {
+    showResult("", "");
+    if (window.HIBFlash) {
+      window.HIBFlash.show(message, type, FLASH_DURATION_MS);
+      window.setTimeout(() => {
+        busy = false;
+      }, FLASH_DURATION_MS);
+    } else {
+      showResult(message, type);
+      busy = false;
+    }
+  }
+
   async function handleDetectedCode(code) {
+    if (busy) return;
+
     const now = Date.now();
     if (code === lastCode && now - lastCodeAt < RESCAN_COOLDOWN_MS) return;
     lastCode = code;
     lastCodeAt = now;
+    busy = true;
 
     showResult("Verificando...", "pending");
 
@@ -129,31 +149,33 @@
         body: JSON.stringify({ code })
       }));
     } catch {
-      showResult("Erro de conexão. Tente novamente.", "error");
+      flashAndResume("Erro de conexão. Tente novamente.", "error");
       return;
     }
 
     if (response.status === 401) {
+      busy = false;
       showLogin(SESSION_EXPIRED_MESSAGE);
       return;
     }
     if (response.status === 403) {
+      busy = false;
       showDenied();
       return;
     }
     if (!response.ok) {
-      showResult(data.error || "Não foi possível confirmar o check-in.", "error");
+      flashAndResume(data.error || "Não foi possível confirmar o check-in.", "error");
       return;
     }
 
     const label = data.alreadyCheckedIn
-      ? `${data.name} já tinha check-in confirmado — ${data.meetupTitle}.`
-      : `Check-in confirmado: ${data.name} — ${data.meetupTitle}.`;
-    showResult(label, data.alreadyCheckedIn ? "repeat" : "success");
+      ? `✓ ${data.name} já tinha check-in confirmado\n${data.meetupTitle}`
+      : `✓ Check-in confirmado: ${data.name}\n${data.meetupTitle}`;
+    flashAndResume(label, "success");
   }
 
   async function scanTick(canvas, ctx, detector) {
-    if (!scanning || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    if (!scanning || busy || video.readyState !== video.HAVE_ENOUGH_DATA) return;
 
     try {
       if (detector) {

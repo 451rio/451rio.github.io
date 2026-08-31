@@ -1,3 +1,35 @@
+window.HIBFlash = (function () {
+  let overlay = null;
+  let hideTimer = null;
+
+  function ensureOverlay() {
+    if (overlay) return overlay;
+    overlay = document.createElement("div");
+    overlay.className = "flash-message";
+    overlay.setAttribute("role", "status");
+    overlay.setAttribute("aria-live", "polite");
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  function hide() {
+    if (!overlay) return;
+    overlay.classList.remove("is-visible");
+  }
+
+  function show(message, type, durationMs) {
+    const el = ensureOverlay();
+    window.clearTimeout(hideTimer);
+    el.textContent = message;
+    el.className = `flash-message is-visible is-${type || "info"}`;
+    if (durationMs) {
+      hideTimer = window.setTimeout(hide, durationMs);
+    }
+  }
+
+  return { show, hide };
+})();
+
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
