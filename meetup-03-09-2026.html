@@ -102,38 +102,40 @@ permalink: /meetup-03-09-2026/
       Carregando disponibilidade...
     </p>
     <form id="meetup-registration-form" class="registration-form" data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev" data-meetup-slug="meetup-03-09-2026" data-meetup-date="2026-09-03">
-      <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
-      <div class="registration-field">
-        <label for="reg-name">Nome completo</label>
-        <input id="reg-name" class="registration-input" type="text" name="name" placeholder="Ex.: Bruno Almeida" required>
-      </div>
-      <div class="registration-field">
-        <label for="reg-email">E-mail</label>
-        <input id="reg-email" class="registration-input" type="email" name="email" placeholder="exemplo@dominio.com" required>
-      </div>
-      <div class="registration-field registration-field-full">
-        <label for="reg-phone">Celular (WhatsApp)</label>
-        <input id="reg-phone" class="registration-input" type="tel" name="phone" placeholder="(11) 912345678" inputmode="numeric" autocomplete="tel-national" maxlength="15" required>
-        <small id="phone-help" class="registration-help">DDD + número, com +55 (Brasil). Ex.: (11) 912345678.</small>
-      </div>
-      <div class="registration-field registration-field-full">
-        <label for="reg-document">Documento</label>
-        <input id="reg-document" class="registration-input" type="text" name="document" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" required>
-        <small id="cpf-help" class="registration-help">Apenas CPF válido será aceito.</small>
-      </div>
       <div class="registration-field registration-field-full">
         <p class="registration-help" id="reg-captcha-status" role="status" aria-live="polite">Verificação de segurança: preparando...</p>
       </div>
-      <label class="registration-consent">
-        <input type="checkbox" name="consentLgpd" required>
-        Autorizo o uso dos meus dados para gestão da inscrição e para
-        comunicações relacionadas a este meetup, conforme a
-        <a href="{{ '/politica-de-privacidade/' | relative_url }}" target="_blank" rel="noopener noreferrer">Política de Privacidade</a>.
-      </label>
-      <div class="registration-actions">
-        <button class="btn btn-primary" type="submit" id="registration-submit" disabled>
-          Inscrever-se
-        </button>
+      <div id="reg-form-fields" class="form-gate" hidden>
+        <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
+        <div class="registration-field">
+          <label for="reg-name">Nome completo</label>
+          <input id="reg-name" class="registration-input" type="text" name="name" placeholder="Ex.: Bruno Almeida" required>
+        </div>
+        <div class="registration-field">
+          <label for="reg-email">E-mail</label>
+          <input id="reg-email" class="registration-input" type="email" name="email" placeholder="exemplo@dominio.com" required>
+        </div>
+        <div class="registration-field registration-field-full">
+          <label for="reg-phone">Celular (WhatsApp)</label>
+          <input id="reg-phone" class="registration-input" type="tel" name="phone" placeholder="(11) 912345678" inputmode="numeric" autocomplete="tel-national" maxlength="15" required>
+          <small id="phone-help" class="registration-help">DDD + número, com +55 (Brasil). Ex.: (11) 912345678.</small>
+        </div>
+        <div class="registration-field registration-field-full">
+          <label for="reg-document">Documento</label>
+          <input id="reg-document" class="registration-input" type="text" name="document" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" required>
+          <small id="cpf-help" class="registration-help">Apenas CPF válido será aceito.</small>
+        </div>
+        <label class="registration-consent">
+          <input type="checkbox" name="consentLgpd" required>
+          Autorizo o uso dos meus dados para gestão da inscrição e para
+          comunicações relacionadas a este meetup, conforme a
+          <a href="{{ '/politica-de-privacidade/' | relative_url }}" target="_blank" rel="noopener noreferrer">Política de Privacidade</a>.
+        </label>
+        <div class="registration-actions">
+          <button class="btn btn-primary" type="submit" id="registration-submit" disabled>
+            Inscrever-se
+          </button>
+        </div>
       </div>
     </form>
     <p class="subscriptions-hint">

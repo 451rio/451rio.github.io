@@ -18,16 +18,18 @@ sitemap: false
       Informe o e-mail autorizado. Enviaremos um link de acesso válido por 15 minutos.
     </p>
     <form id="checkin-login-form" class="registration-form">
-      <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
-      <div class="registration-field registration-field-full">
-        <label for="checkin-login-email">E-mail</label>
-        <input id="checkin-login-email" class="registration-input" type="email" name="email" placeholder="exemplo@dominio.com" autocomplete="email" required>
-      </div>
       <div class="registration-field registration-field-full">
         <p class="registration-help" id="checkin-captcha-status" role="status" aria-live="polite">Verificação de segurança: preparando...</p>
       </div>
-      <div class="registration-actions">
-        <button class="btn btn-primary" type="submit" id="checkin-login-submit">Receber link de acesso</button>
+      <div id="checkin-login-form-fields" class="form-gate" hidden>
+        <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
+        <div class="registration-field registration-field-full">
+          <label for="checkin-login-email">E-mail</label>
+          <input id="checkin-login-email" class="registration-input" type="email" name="email" placeholder="exemplo@dominio.com" autocomplete="email" required>
+        </div>
+        <div class="registration-actions">
+          <button class="btn btn-primary" type="submit" id="checkin-login-submit">Receber link de acesso</button>
+        </div>
       </div>
     </form>
   </section>

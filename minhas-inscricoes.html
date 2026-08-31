@@ -32,17 +32,19 @@ sitemap: false
       Informe o e-mail usado na inscrição. Enviaremos um link de acesso válido por 15 minutos.
     </p>
     <form id="magic-link-form" class="registration-form">
-      <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
-      <div class="registration-field registration-field-full">
-        <label for="login-email">E-mail</label>
-        <input id="login-email" class="registration-input" type="email" name="email" placeholder="exemplo@dominio.com" autocomplete="email" required>
-        <small class="registration-help">Use o mesmo e-mail informado na inscrição do meetup.</small>
-      </div>
       <div class="registration-field registration-field-full">
         <p class="registration-help" id="login-captcha-status" role="status" aria-live="polite">Verificação de segurança: preparando...</p>
       </div>
-      <div class="registration-actions">
-        <button class="btn btn-primary" type="submit" id="magic-link-submit">Receber link de acesso</button>
+      <div id="login-form-fields" class="form-gate" hidden>
+        <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
+        <div class="registration-field registration-field-full">
+          <label for="login-email">E-mail</label>
+          <input id="login-email" class="registration-input" type="email" name="email" placeholder="exemplo@dominio.com" autocomplete="email" required>
+          <small class="registration-help">Use o mesmo e-mail informado na inscrição do meetup.</small>
+        </div>
+        <div class="registration-actions">
+          <button class="btn btn-primary" type="submit" id="magic-link-submit">Receber link de acesso</button>
+        </div>
       </div>
     </form>
   </section>

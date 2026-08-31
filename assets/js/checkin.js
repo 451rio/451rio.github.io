@@ -14,6 +14,7 @@
   const loginEmail = document.getElementById("checkin-login-email");
   const loginSubmit = document.getElementById("checkin-login-submit");
   const captchaStatus = document.getElementById("checkin-captcha-status");
+  const loginFormFields = document.getElementById("checkin-login-form-fields");
 
   const deniedSection = document.getElementById("checkin-denied-section");
 
@@ -25,7 +26,7 @@
 
   const requiredNodes = [
     loadingSection, loadingStatus,
-    loginSection, loginStatus, loginForm, loginEmail, loginSubmit, captchaStatus,
+    loginSection, loginStatus, loginForm, loginEmail, loginSubmit, captchaStatus, loginFormFields,
     deniedSection,
     scanSection, scanStatus, logoutButton, video, resultContainer
   ];
@@ -70,7 +71,14 @@
     stopScanning();
     showOnly(loginSection);
     if (message) loginStatus.textContent = message;
-    captcha.render();
+    loginFormFields.hidden = true;
+    captcha.render().then(function () {
+      if (captcha.ready()) {
+        loginFormFields.hidden = false;
+      } else {
+        loginStatus.textContent = "Não foi possível carregar o formulário. Recarregue a página.";
+      }
+    });
   }
 
   function showDenied() {
@@ -322,7 +330,7 @@
     const cleanUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
     window.history.replaceState({}, document.title, cleanUrl);
 
-    return token;
+    return F.isOpaqueToken(token) ? token : "";
   }
 
   if (!apiBase) {

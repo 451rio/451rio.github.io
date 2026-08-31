@@ -49,76 +49,77 @@ permalink: /submeter-palestra/
   <section class="meetup-card">
     <h2>Sua proposta</h2>
     <form id="talk-form" class="registration-form" data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev">
-      <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
-      <div class="registration-field registration-field-full">
-        <label for="talk-title">Título da palestra</label>
-        <input id="talk-title" class="registration-input" type="text" name="title" placeholder="Título da sua palestra" maxlength="200" required>
-      </div>
-      <div class="registration-field registration-field-full">
-        <label for="talk-abstract">Descreva um pouco do conteúdo que pretende apresentar</label>
-        <textarea id="talk-abstract" class="registration-input registration-textarea" name="abstract" rows="5" maxlength="5000" placeholder="Resumo do conteúdo, objetivos e o que o público vai aprender." required></textarea>
-      </div>
-      <div class="registration-field">
-        <label for="talk-name">Como podemos te chamar?</label>
-        <input id="talk-name" class="registration-input" type="text" name="speakerName" placeholder="Seu nome ou como prefere ser chamado(a)" maxlength="200" required>
-      </div>
-      <div class="registration-field">
-        <label for="talk-email">E-mail</label>
-        <input id="talk-email" class="registration-input" type="email" name="email" placeholder="exemplo@dominio.com" required>
-      </div>
-      <div class="registration-field">
-        <label for="talk-phone">Telefone (opcional)</label>
-        <input id="talk-phone" class="registration-input" type="tel" name="phone" placeholder="(11) 912345678" inputmode="numeric" autocomplete="tel-national" maxlength="15">
-        <small id="talk-phone-help" class="registration-help">Opcional. DDD + número, com +55 (Brasil). Ex.: (11) 912345678.</small>
-      </div>
-      <div class="registration-field">
-        <label for="talk-photo">Link público de uma foto sua em boa qualidade</label>
-        <input id="talk-photo" class="registration-input" type="url" name="photoUrl" placeholder="https://..." maxlength="500" required>
-        <small class="registration-help">Usaremos na divulgação. Ex.: link do Drive, Dropbox ou rede social (público).</small>
-      </div>
-      <div class="registration-field registration-field-full">
-        <label for="talk-bio">Sua minibio</label>
-        <textarea id="talk-bio" class="registration-input registration-textarea" name="bio" rows="4" maxlength="3000" placeholder="Um breve resumo sobre você para apresentarmos ao público." required></textarea>
-      </div>
-
-      <fieldset class="registration-field registration-field-full registration-fieldset">
-        <legend>Você tem disponibilidade de palestrar de forma PRESENCIAL no Rio de Janeiro (RJ)?</legend>
-        <div class="registration-radio-group">
-          <label class="registration-radio">
-            <input type="radio" name="inPerson" value="sim" required> Sim
-          </label>
-          <label class="registration-radio">
-            <input type="radio" name="inPerson" value="nao"> Não
-          </label>
-        </div>
-      </fieldset>
-
-      <label class="registration-consent">
-        <input type="checkbox" name="imageConsent" required>
-        <span>
-          <strong>Termo de uso de imagem:</strong> autorizo o Hack in Brasil a utilizar minha
-          imagem, voz e nome para fins de divulgação e promoção das atividades relacionadas ao
-          evento, em conformidade com a LGPD (Lei nº 13.709/2018).
-        </span>
-      </label>
-
-      <label class="registration-consent">
-        <input type="checkbox" name="termsAck" required>
-        <span>
-          Estou ciente de que também preciso me inscrever no evento e ficar atento(a) ao contato
-          da organização. Caso precise de algum equipamento específico para a apresentação,
-          avisarei com antecedência para que a possibilidade seja verificada.
-        </span>
-      </label>
-
       <div class="registration-field registration-field-full">
         <p class="registration-help" id="talk-captcha-status" role="status" aria-live="polite">Verificação de segurança: preparando...</p>
       </div>
+      <div id="talk-form-fields" class="form-gate" hidden>
+        <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
+        <div class="registration-field registration-field-full">
+          <label for="talk-title">Título da palestra</label>
+          <input id="talk-title" class="registration-input" type="text" name="title" placeholder="Título da sua palestra" maxlength="200" required>
+        </div>
+        <div class="registration-field registration-field-full">
+          <label for="talk-abstract">Descreva um pouco do conteúdo que pretende apresentar</label>
+          <textarea id="talk-abstract" class="registration-input registration-textarea" name="abstract" rows="5" maxlength="5000" placeholder="Resumo do conteúdo, objetivos e o que o público vai aprender." required></textarea>
+        </div>
+        <div class="registration-field">
+          <label for="talk-name">Como podemos te chamar?</label>
+          <input id="talk-name" class="registration-input" type="text" name="speakerName" placeholder="Seu nome ou como prefere ser chamado(a)" maxlength="200" required>
+        </div>
+        <div class="registration-field">
+          <label for="talk-email">E-mail</label>
+          <input id="talk-email" class="registration-input" type="email" name="email" placeholder="exemplo@dominio.com" required>
+        </div>
+        <div class="registration-field">
+          <label for="talk-phone">Telefone (opcional)</label>
+          <input id="talk-phone" class="registration-input" type="tel" name="phone" placeholder="(11) 912345678" inputmode="numeric" autocomplete="tel-national" maxlength="15">
+          <small id="talk-phone-help" class="registration-help">Opcional. DDD + número, com +55 (Brasil). Ex.: (11) 912345678.</small>
+        </div>
+        <div class="registration-field">
+          <label for="talk-photo">Link público de uma foto sua em boa qualidade</label>
+          <input id="talk-photo" class="registration-input" type="url" name="photoUrl" placeholder="https://..." maxlength="500" required>
+          <small class="registration-help">Usaremos na divulgação. Ex.: link do Drive, Dropbox ou rede social (público).</small>
+        </div>
+        <div class="registration-field registration-field-full">
+          <label for="talk-bio">Sua minibio</label>
+          <textarea id="talk-bio" class="registration-input registration-textarea" name="bio" rows="4" maxlength="3000" placeholder="Um breve resumo sobre você para apresentarmos ao público." required></textarea>
+        </div>
 
-      <div class="registration-actions">
-        <button class="btn btn-primary" type="submit" id="talk-submit">
-          Enviar proposta
-        </button>
+        <fieldset class="registration-field registration-field-full registration-fieldset">
+          <legend>Você tem disponibilidade de palestrar de forma PRESENCIAL no Rio de Janeiro (RJ)?</legend>
+          <div class="registration-radio-group">
+            <label class="registration-radio">
+              <input type="radio" name="inPerson" value="sim" required> Sim
+            </label>
+            <label class="registration-radio">
+              <input type="radio" name="inPerson" value="nao"> Não
+            </label>
+          </div>
+        </fieldset>
+
+        <label class="registration-consent">
+          <input type="checkbox" name="imageConsent" required>
+          <span>
+            <strong>Termo de uso de imagem:</strong> autorizo o Hack in Brasil a utilizar minha
+            imagem, voz e nome para fins de divulgação e promoção das atividades relacionadas ao
+            evento, em conformidade com a LGPD (Lei nº 13.709/2018).
+          </span>
+        </label>
+
+        <label class="registration-consent">
+          <input type="checkbox" name="termsAck" required>
+          <span>
+            Estou ciente de que também preciso me inscrever no evento e ficar atento(a) ao contato
+            da organização. Caso precise de algum equipamento específico para a apresentação,
+            avisarei com antecedência para que a possibilidade seja verificada.
+          </span>
+        </label>
+
+        <div class="registration-actions">
+          <button class="btn btn-primary" type="submit" id="talk-submit">
+            Enviar proposta
+          </button>
+        </div>
       </div>
     </form>
   </section>

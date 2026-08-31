@@ -267,14 +267,19 @@ function isAdminEmail(email, env) {
   return admins.includes(String(email || "").trim().toLowerCase());
 }
 
+function stripTrailingSlashes(value) {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+  return value.slice(0, end);
+}
+
 function getSiteBaseUrl(env) {
-  const configured = String(env.SITE_BASE_URL || "").trim().replace(/\/+$/, "");
+  const configured = stripTrailingSlashes(String(env.SITE_BASE_URL || "").trim());
   if (configured) return configured;
 
-  const firstAllowedOrigin = String(env.ALLOWED_ORIGIN || "")
-    .split(",")[0]
-    .trim()
-    .replace(/\/+$/, "");
+  const firstAllowedOrigin = stripTrailingSlashes(
+    String(env.ALLOWED_ORIGIN || "").split(",")[0].trim()
+  );
 
   return firstAllowedOrigin || "https://hackinbrasil.com.br";
 }

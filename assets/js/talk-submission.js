@@ -7,6 +7,7 @@
   const phoneInput = document.getElementById("talk-phone");
   const phoneHelp = document.getElementById("talk-phone-help");
   const captchaStatus = document.getElementById("talk-captcha-status");
+  const formFields = document.getElementById("talk-form-fields");
 
   if (!form || !submit || !feedbackModal || !feedbackTitle || !feedbackMessage) return;
   if (!window.HIBForms) return;
@@ -37,7 +38,8 @@
     "disponibilidade presencial": form.querySelector('[name="inPerson"]'),
     "uso de imagem": form.querySelector('[name="imageConsent"]'),
     "ciência das orientações": form.querySelector('[name="termsAck"]'),
-    "verificação": captchaStatus
+    "verificação": captchaStatus,
+    "campos do formulário": formFields
   };
   const missingControls = Object.keys(requiredControls).filter((label) => !requiredControls[label]);
   if (missingControls.length > 0) {
@@ -156,5 +158,11 @@
     }
   });
 
-  captcha.render();
+  captcha.render().then(function () {
+    if (captcha.ready()) {
+      formFields.hidden = false;
+    } else {
+      feedback.show("Não foi possível carregar o formulário. Recarregue a página.", "error");
+    }
+  });
 })();

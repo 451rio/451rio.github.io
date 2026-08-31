@@ -7,6 +7,7 @@
   const phoneInput = document.getElementById("sponsor-phone");
   const phoneHelp = document.getElementById("sponsor-phone-help");
   const captchaStatus = document.getElementById("sponsor-captcha-status");
+  const formFields = document.getElementById("sponsor-form-fields");
 
   if (!form || !submit || !feedbackModal || !feedbackTitle || !feedbackMessage) return;
   if (!window.HIBForms) return;
@@ -32,7 +33,8 @@
     "pessoa para contato": form.querySelector('[name="contactName"]'),
     "e-mail": form.querySelector('[name="email"]'),
     "celular": phoneInput,
-    "verificação": captchaStatus
+    "verificação": captchaStatus,
+    "campos do formulário": formFields
   };
   const missingControls = Object.keys(requiredControls).filter((label) => !requiredControls[label]);
   if (missingControls.length > 0) {
@@ -133,5 +135,11 @@
     }
   });
 
-  captcha.render();
+  captcha.render().then(function () {
+    if (captcha.ready()) {
+      formFields.hidden = false;
+    } else {
+      feedback.show("Não foi possível carregar o formulário. Recarregue a página.", "error");
+    }
+  });
 })();

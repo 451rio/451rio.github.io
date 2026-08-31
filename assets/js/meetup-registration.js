@@ -8,6 +8,7 @@
   const cpfInput = document.getElementById("reg-document");
   const cpfHelp = document.getElementById("cpf-help");
   const captchaStatus = document.getElementById("reg-captcha-status");
+  const formFields = document.getElementById("reg-form-fields");
   const phoneInput = document.getElementById("reg-phone");
   const phoneHelp = document.getElementById("phone-help");
 
@@ -79,6 +80,7 @@
     "celular": phoneInput,
     "documento": cpfInput,
     "verificação": captchaStatus,
+    "campos do formulário": formFields,
     "consentimento LGPD": form.querySelector('[name="consentLgpd"]')
   };
   const missingControls = Object.keys(requiredControls).filter((label) => !requiredControls[label]);
@@ -256,6 +258,12 @@
     }
   });
 
-  captcha.render();
+  captcha.render().then(function () {
+    if (captcha.ready()) {
+      formFields.hidden = false;
+    } else {
+      feedback.show("Não foi possível carregar o formulário. Recarregue a página.", "error");
+    }
+  });
   refreshStatus();
 })();

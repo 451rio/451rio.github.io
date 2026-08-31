@@ -15,6 +15,7 @@
   const loginEmail = document.getElementById("login-email");
   const loginSubmit = document.getElementById("magic-link-submit");
   const captchaStatus = document.getElementById("login-captcha-status");
+  const loginFormFields = document.getElementById("login-form-fields");
 
   const profileSection = document.getElementById("profile-section");
   const profileSummary = document.getElementById("profile-summary");
@@ -45,7 +46,7 @@
 
   const requiredNodes = [
     loadingSection, loadingStatus, retryButton,
-    loginSection, loginStatus, loginForm, loginEmail, loginSubmit, captchaStatus,
+    loginSection, loginStatus, loginForm, loginEmail, loginSubmit, captchaStatus, loginFormFields,
     profileSection, profileSummary, profileForm, profileNickname, profilePublic, profileSubmit,
     profileNicknameHelp,
     listSection, list, accountEmail, logoutButton,
@@ -189,7 +190,14 @@
     showOnly(loginSection);
     retryButton.hidden = true;
     if (message) loginStatus.textContent = message;
-    captcha.render();
+    loginFormFields.hidden = true;
+    captcha.render().then(function () {
+      if (captcha.ready()) {
+        loginFormFields.hidden = false;
+      } else {
+        feedback.show("Não foi possível carregar o formulário. Recarregue a página.", "error");
+      }
+    });
   }
 
   function showLoading(message) {
@@ -759,7 +767,7 @@
     const cleanUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
     window.history.replaceState({}, document.title, cleanUrl);
 
-    return token;
+    return F.isOpaqueToken(token) ? token : "";
   }
 
   if (!apiBase) {

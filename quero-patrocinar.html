@@ -21,43 +21,45 @@ permalink: /quero-patrocinar/
   <section class="meetup-card">
     <h2>Dados para patrocínio</h2>
     <form id="sponsor-form" class="registration-form" data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev">
-      <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
-      <div class="registration-field">
-        <label for="sponsor-company">Empresa</label>
-        <input id="sponsor-company" class="registration-input" type="text" name="company" placeholder="Nome da empresa" maxlength="200" required>
-      </div>
-      <div class="registration-field">
-        <label for="sponsor-website">Site da empresa</label>
-        <input id="sponsor-website" class="registration-input" type="text" name="website" placeholder="https://empresa.com.br" maxlength="300" autocomplete="url">
-      </div>
-      <div class="registration-field">
-        <label for="sponsor-contact">Pessoa para contato</label>
-        <input id="sponsor-contact" class="registration-input" type="text" name="contactName" placeholder="Nome completo" maxlength="200" required>
-      </div>
-      <div class="registration-field">
-        <label for="sponsor-role">Cargo</label>
-        <input id="sponsor-role" class="registration-input" type="text" name="role" placeholder="Ex.: Head de Marketing" maxlength="150">
-      </div>
-      <div class="registration-field">
-        <label for="sponsor-email">Seu melhor e-mail</label>
-        <input id="sponsor-email" class="registration-input" type="email" name="email" placeholder="contato@empresa.com.br" required>
-      </div>
-      <div class="registration-field">
-        <label for="sponsor-phone">Celular para contato</label>
-        <input id="sponsor-phone" class="registration-input" type="tel" name="phone" placeholder="(11) 912345678" inputmode="numeric" autocomplete="tel-national" maxlength="15" required>
-        <small id="sponsor-phone-help" class="registration-help">DDD + número, com +55 (Brasil). Ex.: (11) 912345678.</small>
-      </div>
-      <div class="registration-field registration-field-full">
-        <label for="sponsor-message">Mensagem / observações</label>
-        <textarea id="sponsor-message" class="registration-input registration-textarea" name="message" rows="4" maxlength="2000" placeholder="Conte um pouco sobre o interesse da empresa em patrocinar (opcional)."></textarea>
-      </div>
       <div class="registration-field registration-field-full">
         <p class="registration-help" id="sponsor-captcha-status" role="status" aria-live="polite">Verificação de segurança: preparando...</p>
       </div>
-      <div class="registration-actions">
-        <button class="btn btn-primary" type="submit" id="sponsor-submit">
-          Enviar solicitação
-        </button>
+      <div id="sponsor-form-fields" class="form-gate" hidden>
+        <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
+        <div class="registration-field">
+          <label for="sponsor-company">Empresa</label>
+          <input id="sponsor-company" class="registration-input" type="text" name="company" placeholder="Nome da empresa" maxlength="200" required>
+        </div>
+        <div class="registration-field">
+          <label for="sponsor-website">Site da empresa</label>
+          <input id="sponsor-website" class="registration-input" type="text" name="website" placeholder="https://empresa.com.br" maxlength="300" autocomplete="url">
+        </div>
+        <div class="registration-field">
+          <label for="sponsor-contact">Pessoa para contato</label>
+          <input id="sponsor-contact" class="registration-input" type="text" name="contactName" placeholder="Nome completo" maxlength="200" required>
+        </div>
+        <div class="registration-field">
+          <label for="sponsor-role">Cargo</label>
+          <input id="sponsor-role" class="registration-input" type="text" name="role" placeholder="Ex.: Head de Marketing" maxlength="150">
+        </div>
+        <div class="registration-field">
+          <label for="sponsor-email">Seu melhor e-mail</label>
+          <input id="sponsor-email" class="registration-input" type="email" name="email" placeholder="contato@empresa.com.br" required>
+        </div>
+        <div class="registration-field">
+          <label for="sponsor-phone">Celular para contato</label>
+          <input id="sponsor-phone" class="registration-input" type="tel" name="phone" placeholder="(11) 912345678" inputmode="numeric" autocomplete="tel-national" maxlength="15" required>
+          <small id="sponsor-phone-help" class="registration-help">DDD + número, com +55 (Brasil). Ex.: (11) 912345678.</small>
+        </div>
+        <div class="registration-field registration-field-full">
+          <label for="sponsor-message">Mensagem / observações</label>
+          <textarea id="sponsor-message" class="registration-input registration-textarea" name="message" rows="4" maxlength="2000" placeholder="Conte um pouco sobre o interesse da empresa em patrocinar (opcional)."></textarea>
+        </div>
+        <div class="registration-actions">
+          <button class="btn btn-primary" type="submit" id="sponsor-submit">
+            Enviar solicitação
+          </button>
+        </div>
       </div>
     </form>
   </section>

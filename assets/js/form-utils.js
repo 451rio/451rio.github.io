@@ -147,6 +147,10 @@ window.HIBForms = (function () {
     return { show };
   }
 
+  function isOpaqueToken(value) {
+    return typeof value === "string" && /^[A-Za-z0-9_-]{32,128}$/.test(value);
+  }
+
   return {
     onlyDigits,
     normalizePhone,
@@ -156,6 +160,7 @@ window.HIBForms = (function () {
     formatCpf,
     isValidCpf,
     createCaptcha,
-    createFeedback
+    createFeedback,
+    isOpaqueToken
   };
 })();
