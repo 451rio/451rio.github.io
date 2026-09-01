@@ -18,6 +18,8 @@ This project keeps a static Jekyll frontend and uses Cloudflare Workers + D1 for
 - Certificate validation page: `certificado.html` + `assets/js/certificate.js`
 - Certificate PDF generator: `workers/meetup-api/src/pdf.js` + `src/certificate-assets.js`
 - Public ranking: `ranking.html` + `assets/js/ranking.js`
+- Check-in scanner (admin-only): `checkin.html` + `assets/js/checkin.js`
+- Duck race raffle (admin-only): `sorteio.html` + `assets/js/sorteio.js`
 - Shared navigation: `_includes/nav.html` (carries the "Minha conta" link on every page)
 - Worker API: `workers/meetup-api/src/index.js`
 - D1 schema/migrations: `workers/meetup-api/migrations/0001_schema.sql`
@@ -148,6 +150,20 @@ It exists because the daily cap used to be measured by counting `sent` rows in
 Those still spend the provider's quota, so the Worker believed it had sent 40 while Resend
 had already seen 100. Every send now passes through one function, and that function writes
 here.
+
+### `raffle_winners`
+
+One row per duck race win (migration `0024`).
+
+- `id` (PK)
+- `meetup_slug` (FK)
+- `registration_id` (FK)
+- `name` — snapshot taken at win time, same reasoning as `certificates.participant_name`
+- `won_at`
+
+A unique index on `(meetup_slug, registration_id)` is the actual "can't win twice" rule —
+the eligibility query (checked-in minus already-won) enforces it in the common path, the
+index enforces it even if two draws ever race each other.
 
 ### `registration_cancellations`
 
@@ -343,6 +359,39 @@ Being signed up for an upcoming meetup is not participation, so it does not scor
 ### `POST /api/auth/logout`
 
 Requires `Authorization: Bearer <session token>`. Revokes the session.
+
+## Duck race raffle (admin, `0024`)
+
+`/sorteio/` reuses the check-in login (`purpose: "admin"` on `/api/auth/magic-link`,
+gated by `ADMIN_EMAILS`) and the same bearer session as `/checkin/` — the two pages share
+the `hib.checkin.session` key in `sessionStorage`, so logging in once opens both for the
+rest of the tab.
+
+### `GET /api/admin/meetups`
+
+Requires an admin session. Returns every `{slug, title, eventDate}` for the meetup picker.
+
+### `GET /api/admin/meetups/:slug/duck-race`
+
+Requires an admin session. Returns:
+
+- `ducks`: `{id, name}` for registrations of that meetup with `checked_in_at` set and no
+  row yet in `raffle_winners` — these are the racers eligible for the next draw.
+- `winners`: `{name, wonAt}` already drawn for that meetup, oldest first.
+
+### `POST /api/admin/meetups/:slug/duck-race/draw`
+
+Requires an admin session. Picks one eligible duck server-side — via rejection sampling
+over `crypto.getRandomValues`, not `% count`, for the same unbiased-selection reason as
+`generateCertificateCode` — inserts it into `raffle_winners`, and returns
+`{winner: {id, name}}`.
+
+- `409` when nobody is left to draw (nobody checked in yet, or everyone already won).
+- The winner is decided **before** the frontend animates anything: the race the audience
+  watches assigns every other duck a slower finish time than the winner's, so the visual
+  order can vary but who crosses the line first cannot.
+- Winning is per meetup, not global: the same person can win once per edition, and is
+  excluded from the eligible pool the moment their row lands in `raffle_winners`.
 
 ### Cleanup
 

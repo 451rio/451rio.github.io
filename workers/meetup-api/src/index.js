@@ -688,6 +688,20 @@ function randomHex(byteLength) {
   return Array.from(buf, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+// Unbiased random integer in [0, count), by rejection sampling over the Uint32
+// space instead of `crypto.getRandomValues() % count` — the naive modulo favors
+// the low end whenever count doesn't evenly divide 2^32.
+function randomIndexBelow(count) {
+  const limit = Math.floor(0x100000000 / count) * count;
+  const buf = new Uint32Array(1);
+  let value;
+  do {
+    crypto.getRandomValues(buf);
+    value = buf[0];
+  } while (value >= limit);
+  return value % count;
+}
+
 const POW_DIFFICULTY_BITS = 10;
 const POW_CHALLENGE_TTL_MINUTES = 5;
 const POW_MIN_SOLVE_SECONDS = 1;
@@ -1354,6 +1368,94 @@ async function handleAdminCheckin(request, env, session, corsOrigin) {
     );
   } catch (err) {
     return serverError(corsOrigin, "admin:checkin", err);
+  }
+}
+
+async function handleAdminMeetupList(env, session, corsOrigin) {
+  if (!isAdminEmail(session.email, env)) {
+    return json({error: "Acesso restrito à organização."}, 403, corsOrigin);
+  }
+
+  try {
+    const rows = await env.DB
+      .prepare("SELECT slug, title, event_date FROM meetups ORDER BY event_date DESC")
+      .all();
+
+    return json(
+      {
+        meetups: (rows.results || []).map((row) => ({
+          slug: row.slug,
+          title: row.title,
+          eventDate: row.event_date
+        }))
+      },
+      200,
+      corsOrigin
+    );
+  } catch (err) {
+    return serverError(corsOrigin, "admin:meetupList", err);
+  }
+}
+
+async function loadDuckRaceEligible(env, slug) {
+  const rows = await env.DB
+    .prepare(
+      `SELECT id, name FROM registrations
+       WHERE meetup_slug = ? AND checked_in_at IS NOT NULL
+         AND id NOT IN (SELECT registration_id FROM raffle_winners WHERE meetup_slug = ?)
+       ORDER BY id`
+    )
+    .bind(slug, slug)
+    .all();
+  return rows.results || [];
+}
+
+async function handleDuckRaceState(env, session, slug, corsOrigin) {
+  if (!isAdminEmail(session.email, env)) {
+    return json({error: "Acesso restrito à organização."}, 403, corsOrigin);
+  }
+
+  try {
+    const ducks = await loadDuckRaceEligible(env, slug);
+    const winnerRows = await env.DB
+      .prepare("SELECT name, won_at FROM raffle_winners WHERE meetup_slug = ? ORDER BY won_at ASC")
+      .bind(slug)
+      .all();
+
+    return json(
+      {
+        ducks: ducks.map((row) => ({id: row.id, name: row.name})),
+        winners: (winnerRows.results || []).map((row) => ({name: row.name, wonAt: row.won_at}))
+      },
+      200,
+      corsOrigin
+    );
+  } catch (err) {
+    return serverError(corsOrigin, "admin:duckRaceState", err);
+  }
+}
+
+async function handleDuckRaceDraw(env, session, slug, corsOrigin) {
+  if (!isAdminEmail(session.email, env)) {
+    return json({error: "Acesso restrito à organização."}, 403, corsOrigin);
+  }
+
+  try {
+    const ducks = await loadDuckRaceEligible(env, slug);
+    if (ducks.length === 0) {
+      return json({error: "Não há participantes elegíveis para a corrida."}, 409, corsOrigin);
+    }
+
+    const winner = ducks[randomIndexBelow(ducks.length)];
+
+    await env.DB
+      .prepare("INSERT INTO raffle_winners (meetup_slug, registration_id, name) VALUES (?, ?, ?)")
+      .bind(slug, winner.id, winner.name)
+      .run();
+
+    return json({winner: {id: winner.id, name: winner.name}}, 200, corsOrigin);
+  } catch (err) {
+    return serverError(corsOrigin, "admin:duckRaceDraw", err);
   }
 }
 
@@ -2354,6 +2456,28 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/admin/checkin") {
         return withSession(request, env, corsOrigin, (session) =>
           handleAdminCheckin(request, env, session, corsOrigin)
+        );
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/admin/meetups") {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleAdminMeetupList(env, session, corsOrigin)
+        );
+      }
+
+      const duckRaceStateMatch = url.pathname.match(/^\/api\/admin\/meetups\/([a-z0-9-]+)\/duck-race$/);
+      if (request.method === "GET" && duckRaceStateMatch) {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleDuckRaceState(env, session, duckRaceStateMatch[1], corsOrigin)
+        );
+      }
+
+      const duckRaceDrawMatch = url.pathname.match(
+        /^\/api\/admin\/meetups\/([a-z0-9-]+)\/duck-race\/draw$/
+      );
+      if (request.method === "POST" && duckRaceDrawMatch) {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleDuckRaceDraw(env, session, duckRaceDrawMatch[1], corsOrigin)
         );
       }
 

@@ -19,6 +19,9 @@ Também agenda e envia e-mails de confirmação com atraso de 10 minutos.
 - `GET /api/certificates/:code` — consulta pública de um certificado
 - `POST /api/me/profile` — apelido e visibilidade no ranking
 - `GET /api/ranking` — ranking público (apelido + XP)
+- `GET /api/admin/meetups` — lista de meetups para o painel de sorteio (restrito)
+- `GET /api/admin/meetups/:slug/duck-race` — participantes elegíveis e ganhadores da corrida de patos (restrito)
+- `POST /api/admin/meetups/:slug/duck-race/draw` — sorteia um vencedor entre quem já fez check-in (restrito)
 
 ## Verificação (captcha) validada no servidor
 
@@ -79,6 +82,23 @@ Também agenda e envia e-mails de confirmação com atraso de 10 minutos.
   meetup futuro não pontua.
 - Apelidos são únicos ignorando caixa e acento, e nomes que se passariam pela organização
   (`admin`, `organizador`, `hackinbrasil`, ...) são recusados.
+
+## Corrida de patos (sorteio, `0024`)
+
+- Área restrita em `/sorteio/` (`sorteio.html` + `assets/js/sorteio.js`), com o mesmo login
+  sem senha do check-in (`purpose: "admin"`) — a sessão do bearer token é compartilhada
+  entre `/checkin/` e `/sorteio/` na mesma aba.
+- O organizador escolhe o meetup num dropdown; a lista de "patos" elegíveis é sempre quem
+  já fez check-in **naquele** meetup e ainda não ganhou uma corrida anterior da mesma edição.
+- Cada sorteio grava uma linha em `raffle_winners` (`meetup_slug`, `registration_id`, `name`,
+  `won_at`); um índice único em `(meetup_slug, registration_id)` garante que ninguém ganha
+  duas vezes na mesma edição, mesmo reabrindo a página ou usando outro dispositivo.
+- `POST /api/admin/meetups/:slug/duck-race/draw` decide o vencedor no servidor (sorteio
+  sem viés por rejection sampling, o mesmo princípio já usado no código do certificado) e
+  só depois grava o resultado — a animação no navegador é só encenação: os outros patos
+  recebem tempos de chegada sorteados, mas sempre mais lentos que o do vencedor.
+- Cada pessoa tem um pato com aparência fixa (cor + acessório), derivada por hash do
+  `registration.id` — a mesma pessoa mantém o mesmo pato em corridas seguintes do evento.
 
 ## Dados coletados
 

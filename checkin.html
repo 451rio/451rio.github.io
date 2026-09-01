@@ -47,7 +47,10 @@ sitemap: false
           Aponte a câmera para o QR code da pessoa.
         </p>
       </div>
-      <button class="btn btn-ghost" type="button" id="checkin-logout-button">Sair</button>
+      <div class="duckrace-header-actions">
+        <a class="btn btn-ghost" href="{{ '/sorteio/' | relative_url }}">Sorteio</a>
+        <button class="btn btn-ghost" type="button" id="checkin-logout-button">Sair</button>
+      </div>
     </div>
     <video id="checkin-video" class="checkin-video" playsinline muted></video>
     <div id="checkin-result" class="checkin-result" role="status" aria-live="polite"></div>

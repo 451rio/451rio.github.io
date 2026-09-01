@@ -2229,6 +2229,147 @@ footer a {
   color: #ff9f9f;
 }
 
+.duckrace-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.duckrace-pond {
+  position: relative;
+  margin-top: 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--border-soft);
+  background:
+    repeating-linear-gradient(120deg, rgba(255, 255, 255, 0.035) 0 2px, transparent 2px 42px),
+    linear-gradient(180deg, #1c5570 0%, #123a4a 100%);
+  overflow: hidden;
+}
+
+.duckrace-lanes {
+  --duckrace-lane-h: 44px;
+  position: relative;
+  margin-right: 30px;
+}
+
+.duckrace-lane {
+  position: relative;
+  height: var(--duckrace-lane-h);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.duckrace-lane:last-child {
+  border-bottom: none;
+}
+
+.duckrace-runner {
+  position: absolute;
+  left: 0.4rem;
+  top: 50%;
+  transform: translate(0, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  will-change: transform;
+}
+
+.duckrace-name {
+  max-width: 11rem;
+  padding: 0 0.35rem;
+  border-radius: var(--radius-pill);
+  background: rgba(5, 10, 14, 0.55);
+  color: var(--text-main);
+  font-family: 'DM Mono', monospace;
+  font-size: calc(var(--duckrace-lane-h) * 0.24);
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.duckrace-duck-svg {
+  width: calc(var(--duckrace-lane-h) * 0.9);
+  height: auto;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
+}
+
+.duckrace-finish {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 30px;
+  background: repeating-conic-gradient(#0b1a20 0% 25%, #f5f7f8 0% 50%) 0 0 / 15px 15px;
+  border-left: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+.duckrace-finish-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: .04em;
+  color: #0b1a20;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.85), 0 0 3px rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+.duckrace-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.duckrace-winner {
+  margin-top: 1rem;
+}
+
+.duckrace-winners {
+  margin-top: 1.2rem;
+}
+
+.duckrace-winners h3 {
+  font-size: 1rem;
+  margin-bottom: 0.6rem;
+  color: var(--text-muted);
+}
+
+.duckrace-winners-list {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.duckrace-winners-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  background: rgba(11, 20, 26, 0.55);
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  padding: 0.55rem 0.8rem;
+}
+
+.duckrace-winner-name {
+  font-weight: 600;
+}
+
+.duckrace-winner-time {
+  color: var(--text-muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
 .flash-message {
   position: fixed;
   inset: 0;
