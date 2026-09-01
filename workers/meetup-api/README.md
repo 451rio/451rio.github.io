@@ -22,6 +22,7 @@ Também agenda e envia e-mails de confirmação com atraso de 10 minutos.
 - `GET /api/admin/meetups` — lista de meetups para o painel de sorteio (restrito)
 - `GET /api/admin/meetups/:slug/duck-race` — participantes elegíveis e ganhadores da corrida de patos (restrito)
 - `POST /api/admin/meetups/:slug/duck-race/draw` — sorteia um vencedor entre quem já fez check-in (restrito)
+- `POST /api/admin/meetups/:slug/duck-race/reset` — apaga os ganhadores registrados de um meetup, liberando todo mundo para concorrer de novo (restrito)
 
 ## Verificação (captcha) validada no servidor
 
@@ -97,8 +98,14 @@ Também agenda e envia e-mails de confirmação com atraso de 10 minutos.
   sem viés por rejection sampling, o mesmo princípio já usado no código do certificado) e
   só depois grava o resultado — a animação no navegador é só encenação: os outros patos
   recebem tempos de chegada sorteados, mas sempre mais lentos que o do vencedor.
-- Cada pessoa tem um pato com aparência fixa (cor + acessório), derivada por hash do
-  `registration.id` — a mesma pessoa mantém o mesmo pato em corridas seguintes do evento.
+- Cada pessoa tem um pato com aparência fixa (cor, fantasia e variante de idade), derivada
+  por hash do `registration.id` — a mesma pessoa mantém o mesmo pato em corridas seguintes
+  do evento. O nome exibido inclui o `#id` porque duas pessoas com check-in podem ter o
+  mesmo nome.
+- `POST /api/admin/meetups/:slug/duck-race/reset` apaga todas as linhas de `raffle_winners`
+  daquele meetup — existe para poder testar o sorteio várias vezes antes do evento (ou
+  reabrir a disputa se for preciso). Exige digitar `RESETAR` no modal de confirmação; não
+  tem como desfazer.
 
 ## Dados coletados
 

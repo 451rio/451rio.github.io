@@ -393,6 +393,14 @@ over `crypto.getRandomValues`, not `% count`, for the same unbiased-selection re
 - Winning is per meetup, not global: the same person can win once per edition, and is
   excluded from the eligible pool the moment their row lands in `raffle_winners`.
 
+### `POST /api/admin/meetups/:slug/duck-race/reset`
+
+Requires an admin session. Deletes every `raffle_winners` row for that meetup, so
+everyone who checked in becomes eligible again. There's no undo — the frontend requires
+typing `RESETAR` in a confirmation modal before calling this. It exists mainly for
+rehearsing the raffle before an event; it also lets an organiser reopen a draw if they
+called it by mistake.
+
 ### Cleanup
 
 The `*/2 * * * *` cron also drops login requests and sessions older than one day.

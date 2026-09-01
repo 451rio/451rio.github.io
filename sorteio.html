@@ -77,8 +77,33 @@ sitemap: false
       <h3>Já ganharam</h3>
       <ul class="duckrace-winners-list" id="duckrace-winners-list"></ul>
     </div>
+
+    <div class="duckrace-reset-row">
+      <button class="btn btn-danger" type="button" id="duckrace-reset-button" disabled>Resetar sorteio deste meetup</button>
+    </div>
   </section>
 </main>
+
+<div class="modal" id="duckrace-reset-modal" aria-hidden="true">
+  <div class="modal-content modal-content--feedback">
+    <button class="modal-close" data-close aria-label="Fechar">✕</button>
+    <h3 id="duckrace-reset-modal-title" class="registration-feedback-title">Resetar sorteio</h3>
+    <p id="duckrace-reset-modal-message" class="registration-feedback-message">
+      Isso apaga quem já ganhou neste meetup — todo mundo com check-in volta a ficar elegível.
+      Não pode ser desfeito.
+    </p>
+    <form id="duckrace-reset-form" class="cancel-form">
+      <label class="cancel-form-label" for="duckrace-reset-confirmation">
+        Para confirmar, digite <strong>RESETAR</strong> no campo abaixo.
+      </label>
+      <input id="duckrace-reset-confirmation" class="registration-input" type="text" placeholder="RESETAR" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" required>
+      <div class="cancel-form-actions">
+        <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
+        <button class="btn btn-danger" type="submit" id="duckrace-reset-confirm-button" disabled>Resetar sorteio</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script src="{{ '/assets/js/form-utils.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/sorteio.js' | relative_url }}"></script>

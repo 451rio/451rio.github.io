@@ -2246,10 +2246,30 @@ footer a {
   overflow: hidden;
 }
 
+/* Three fixed density tiers (set as `data-density` by sorteio.js from the racer count)
+   instead of a size-to-fit formula — a pond with ~100 racers needs a hard floor on font
+   and icon size, which a smooth scale-to-fit curve would eventually shrink past. */
 .duckrace-lanes {
-  --duckrace-lane-h: 44px;
+  --duckrace-lane-h: 46px;
+  --duckrace-name-size: 0.72rem;
+  --duckrace-name-max-w: 11rem;
+  --duckrace-duck-w: 2.6rem;
   position: relative;
   margin-right: 30px;
+}
+
+.duckrace-lanes[data-density="cozy"] {
+  --duckrace-lane-h: 32px;
+  --duckrace-name-size: 0.62rem;
+  --duckrace-name-max-w: 8rem;
+  --duckrace-duck-w: 1.9rem;
+}
+
+.duckrace-lanes[data-density="compact"] {
+  --duckrace-lane-h: 22px;
+  --duckrace-name-size: 0.5rem;
+  --duckrace-name-max-w: 5.5rem;
+  --duckrace-duck-w: 1.3rem;
 }
 
 .duckrace-lane {
@@ -2275,13 +2295,13 @@ footer a {
 }
 
 .duckrace-name {
-  max-width: 11rem;
+  max-width: var(--duckrace-name-max-w);
   padding: 0 0.35rem;
   border-radius: var(--radius-pill);
   background: rgba(5, 10, 14, 0.55);
   color: var(--text-main);
   font-family: 'DM Mono', monospace;
-  font-size: calc(var(--duckrace-lane-h) * 0.24);
+  font-size: var(--duckrace-name-size);
   line-height: 1.5;
   white-space: nowrap;
   overflow: hidden;
@@ -2289,7 +2309,7 @@ footer a {
 }
 
 .duckrace-duck-svg {
-  width: calc(var(--duckrace-lane-h) * 0.9);
+  width: var(--duckrace-duck-w);
   height: auto;
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
 }
@@ -2368,6 +2388,14 @@ footer a {
   font-family: 'DM Mono', monospace;
   font-size: 0.75rem;
   white-space: nowrap;
+}
+
+.duckrace-reset-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.6rem;
+  padding-top: 1.2rem;
+  border-top: 1px dashed var(--border-soft);
 }
 
 .flash-message {

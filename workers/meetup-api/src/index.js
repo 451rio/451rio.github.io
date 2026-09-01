@@ -1418,14 +1418,20 @@ async function handleDuckRaceState(env, session, slug, corsOrigin) {
   try {
     const ducks = await loadDuckRaceEligible(env, slug);
     const winnerRows = await env.DB
-      .prepare("SELECT name, won_at FROM raffle_winners WHERE meetup_slug = ? ORDER BY won_at ASC")
+      .prepare(
+        "SELECT registration_id, name, won_at FROM raffle_winners WHERE meetup_slug = ? ORDER BY won_at ASC"
+      )
       .bind(slug)
       .all();
 
     return json(
       {
         ducks: ducks.map((row) => ({id: row.id, name: row.name})),
-        winners: (winnerRows.results || []).map((row) => ({name: row.name, wonAt: row.won_at}))
+        winners: (winnerRows.results || []).map((row) => ({
+          id: row.registration_id,
+          name: row.name,
+          wonAt: row.won_at
+        }))
       },
       200,
       corsOrigin
@@ -1456,6 +1462,23 @@ async function handleDuckRaceDraw(env, session, slug, corsOrigin) {
     return json({winner: {id: winner.id, name: winner.name}}, 200, corsOrigin);
   } catch (err) {
     return serverError(corsOrigin, "admin:duckRaceDraw", err);
+  }
+}
+
+async function handleDuckRaceReset(env, session, slug, corsOrigin) {
+  if (!isAdminEmail(session.email, env)) {
+    return json({error: "Acesso restrito à organização."}, 403, corsOrigin);
+  }
+
+  try {
+    const result = await env.DB
+      .prepare("DELETE FROM raffle_winners WHERE meetup_slug = ?")
+      .bind(slug)
+      .run();
+
+    return json({ok: true, removed: result.meta?.changes || 0}, 200, corsOrigin);
+  } catch (err) {
+    return serverError(corsOrigin, "admin:duckRaceReset", err);
   }
 }
 
@@ -2478,6 +2501,15 @@ export default {
       if (request.method === "POST" && duckRaceDrawMatch) {
         return withSession(request, env, corsOrigin, (session) =>
           handleDuckRaceDraw(env, session, duckRaceDrawMatch[1], corsOrigin)
+        );
+      }
+
+      const duckRaceResetMatch = url.pathname.match(
+        /^\/api\/admin\/meetups\/([a-z0-9-]+)\/duck-race\/reset$/
+      );
+      if (request.method === "POST" && duckRaceResetMatch) {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleDuckRaceReset(env, session, duckRaceResetMatch[1], corsOrigin)
         );
       }
 
