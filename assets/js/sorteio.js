@@ -25,6 +25,7 @@
   const pondEl = document.getElementById("duckrace-pond");
   const lanesEl = document.getElementById("duckrace-lanes");
   const startButton = document.getElementById("duckrace-start-button");
+  const muteButton = document.getElementById("duckrace-mute-button");
   const winnerBox = document.getElementById("duckrace-winner");
   const winnersSection = document.getElementById("duckrace-winners-section");
   const winnersList = document.getElementById("duckrace-winners-list");
@@ -39,7 +40,7 @@
     loadingSection, loadingStatus,
     loginSection, loginStatus, loginForm, loginEmail, loginSubmit, captchaStatus, loginFormFields,
     deniedSection,
-    mainSection, logoutButton, meetupSelect, statusEl, pondEl, lanesEl, startButton,
+    mainSection, logoutButton, meetupSelect, statusEl, pondEl, lanesEl, startButton, muteButton,
     winnerBox, winnersSection, winnersList, resetButton,
     resetModal, resetForm, resetInput, resetConfirmButton
   ];
@@ -47,21 +48,14 @@
 
   const captcha = F.createCaptcha(apiBase, captchaStatus);
 
-  // Same key as checkin.js on purpose: logging in once at /checkin/ (or here) keeps
-  // both admin tools open for the rest of the tab's session.
-  const SESSION_KEY = "hib.checkin.session";
+  const SESSION_KEY = "hib.subscriptions.session";
   const SESSION_EXPIRED_MESSAGE = "Sua sessão expirou. Informe o e-mail para receber um novo link de acesso.";
 
-  // Colors, costumes and age variants are three independent axes hashed off the
-  // registration id, so ~100 ducks in the same pond still read as distinct individuals
-  // without the list needing to be manually curated.
   const DUCK_COLORS = [
     "#f4d74d", "#ff9f43", "#2fc3a2", "#ff6b9d", "#4dd0e1",
     "#a78bfa", "#ff6b6b", "#82c91e", "#f5f7f8", "#c08552",
     "#3a86ff", "#e07a5f"
   ];
-  // Superhero-flavored costumes are original silhouettes (cowl + cape, bold cape +
-  // emblem) rather than any specific copyrighted character's design.
   const DUCK_COSTUMES = [
     "none", "bowtie", "sunglasses", "cap", "flower", "bandana",
     "cowl-hero", "cape-hero", "wizard", "pirate", "crown", "headphones"
@@ -70,11 +64,16 @@
 
   const RESET_CONFIRMATION_WORD = "RESETAR";
 
-  const WINNER_MIN_MS = 8000;
-  const WINNER_MAX_MS = 10500;
-  const OTHER_MIN_MS = 11500;
-  const OTHER_MAX_MS = 17000;
+  const WINNER_MIN_MS = 13000;
+  const WINNER_MAX_MS = 16000;
+  const OTHER_MIN_MS = 17500;
+  const OTHER_MAX_MS = 25000;
   const WINNER_FLASH_MS = 3600;
+  const START_STAGGER_MS = 350;
+  const QUACK_MIN_GAP_MS = 450;
+  const QUACK_GAP_SPREAD_MS = 900;
+  const VICTORY_RUN_MS = 1600;
+  const VICTORY_RUN_PX = 42;
 
   let meetupsCache = [];
   let currentSlug = "";
@@ -157,7 +156,6 @@
     return { color, costume, variant };
   }
 
-  // Drawn before the head, so a cape reads as attached at the back of the body.
   function costumeBackMarkup(costume) {
     if (costume === "cowl-hero") {
       return '<path d="M8,22 Q2,32 8,40 L22,34 Q15,28 22,24 Z" fill="#1b1b2e"/>';
@@ -185,7 +183,6 @@
     return "";
   }
 
-  // Drawn after the eye/variant details, so masks, hats and glasses sit on top of them.
   function costumeFrontMarkup(costume) {
     switch (costume) {
       case "bowtie":
@@ -239,9 +236,6 @@
       '</svg>';
   }
 
-  // Fixed density tiers (backed by CSS custom properties per `data-density`) instead of
-  // a continuous formula: a pond with ~100 racers needs a hard legibility floor on font
-  // size and icon size, which a smooth scale-to-fit curve would eventually shrink past.
   function densityFor(count) {
     if (count <= 10) return "roomy";
     if (count <= 30) return "cozy";
@@ -269,8 +263,6 @@
 
       const nameTag = document.createElement("span");
       nameTag.className = "duckrace-name";
-      // The id is appended because two checked-in people can share the same name —
-      // it's the only thing that disambiguates them at a glance.
       nameTag.textContent = `${duck.name} #${duck.id}`;
 
       const duckIconHolder = document.createElement("div");
@@ -467,9 +459,102 @@
     await initMain();
   }
 
-  // Runs a purely cosmetic race: the winner is already decided server-side by the
-  // draw endpoint, so every other duck is given a finish time strictly slower than
-  // the winner's. The visible order can vary lap to lap, but who crosses first never does.
+  function createAudioEngine() {
+    let ctx = null;
+    let muted = false;
+
+    function getCtx() {
+      if (!ctx) {
+        const AudioCtor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtor) return null;
+        try {
+          ctx = new AudioCtor();
+        } catch {
+          return null;
+        }
+      }
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      return ctx;
+    }
+
+    function tone(audioCtx, startAt, options) {
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = options.type || "sine";
+        osc.frequency.setValueAtTime(options.from, startAt);
+        if (options.to) {
+          osc.frequency.exponentialRampToValueAtTime(Math.max(options.to, 1), startAt + options.duration);
+        }
+        gain.gain.setValueAtTime(0.0001, startAt);
+        gain.gain.exponentialRampToValueAtTime(options.peak, startAt + options.duration * 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startAt + options.duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(startAt);
+        osc.stop(startAt + options.duration + 0.03);
+      } catch {
+      }
+    }
+
+    return {
+      prime() {
+        getCtx();
+      },
+      playStart() {
+        if (muted) return;
+        const audioCtx = getCtx();
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+        tone(audioCtx, now, { from: 392, duration: 0.2, type: "sawtooth", peak: 0.16 });
+        tone(audioCtx, now + 0.18, { from: 523.25, duration: 0.4, type: "sawtooth", peak: 0.18 });
+      },
+      playQuack() {
+        if (muted) return;
+        const audioCtx = getCtx();
+        if (!audioCtx) return;
+        const from = 520 + Math.random() * 140;
+        tone(audioCtx, audioCtx.currentTime, {
+          from,
+          to: from * 0.45,
+          duration: 0.13,
+          type: "square",
+          peak: 0.07
+        });
+      },
+      playVictory() {
+        if (muted) return;
+        const audioCtx = getCtx();
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, index) => {
+          tone(audioCtx, now + index * 0.13, { from: freq, duration: 0.26, type: "triangle", peak: 0.15 });
+        });
+      },
+      setMuted(value) {
+        muted = value;
+      },
+      isMuted() {
+        return muted;
+      }
+    };
+  }
+
+  const audio = createAudioEngine();
+
+  function raceProgress(entry, elapsed) {
+    const span = Math.max(1, entry.finishTime - entry.startDelay);
+    const u = Math.min(1, Math.max(0, (elapsed - entry.startDelay) / span));
+    if (u <= 0) return 0;
+    if (u >= 1) return 1;
+
+    const envelope = Math.sin(Math.PI * u);
+    const surge = entry.surgeAmp * Math.sin(2 * Math.PI * entry.surgeFreq * u + entry.surgePhase) * envelope;
+    const ripple = entry.rippleAmp * Math.sin(2 * Math.PI * entry.rippleFreq * u + entry.ripplePhase) * envelope;
+
+    return Math.min(1, Math.max(0, u + surge + ripple));
+  }
+
   function animateRace(winnerId) {
     return new Promise((resolve) => {
       const laneHeightPx = parseFloat(getComputedStyle(lanesEl).getPropertyValue("--duckrace-lane-h")) || 44;
@@ -488,7 +573,15 @@
           el: runner,
           trackWidth,
           finishTime,
-          phase: Math.random() * Math.PI * 2,
+          startDelay: Math.random() * START_STAGGER_MS,
+          surgeAmp: 0.05 + Math.random() * 0.035,
+          surgeFreq: 0.5 + Math.random() * 0.3,
+          surgePhase: Math.random() * Math.PI * 2,
+          rippleAmp: 0.008 + Math.random() * 0.007,
+          rippleFreq: 1.2 + Math.random() * 0.5,
+          ripplePhase: Math.random() * Math.PI * 2,
+          bobPhase: Math.random() * Math.PI * 2,
+          frozenX: null,
           isWinner
         });
       });
@@ -498,25 +591,47 @@
         return;
       }
 
+      const winnerEntry = entries.find((entry) => entry.isWinner) || entries[0];
       const start = performance.now();
+      let nextQuackAt = QUACK_MIN_GAP_MS + Math.random() * QUACK_GAP_SPREAD_MS;
+      let winnerCrossedAt = null;
 
       function tick(now) {
         const elapsed = now - start;
-        let winnerDone = false;
+
+        if (winnerCrossedAt === null && elapsed >= nextQuackAt) {
+          audio.playQuack();
+          nextQuackAt = elapsed + QUACK_MIN_GAP_MS + Math.random() * QUACK_GAP_SPREAD_MS;
+        }
+
+        if (winnerCrossedAt === null && elapsed >= winnerEntry.finishTime) {
+          winnerCrossedAt = elapsed;
+          audio.playVictory();
+          entries.forEach((entry) => {
+            if (!entry.isWinner) entry.frozenX = raceProgress(entry, elapsed) * entry.trackWidth;
+          });
+        }
 
         entries.forEach((entry) => {
-          const raw = Math.min(1, elapsed / entry.finishTime);
-          const eased = 1 - Math.pow(1 - raw, 3);
-          const x = eased * entry.trackWidth;
-          const bob = Math.sin(elapsed / 220 + entry.phase) * bobAmplitude;
+          let x;
+          if (entry.frozenX !== null) {
+            x = entry.frozenX;
+          } else if (entry.isWinner && winnerCrossedAt !== null) {
+            const victory = Math.min(1, (elapsed - winnerCrossedAt) / VICTORY_RUN_MS);
+            x = entry.trackWidth + (1 - Math.pow(1 - victory, 3)) * VICTORY_RUN_PX;
+          } else {
+            x = raceProgress(entry, elapsed) * entry.trackWidth;
+          }
+
+          const bob = Math.sin(elapsed / 220 + entry.bobPhase) * bobAmplitude;
           entry.el.style.transform = `translate(${x}px, calc(-50% + ${bob}px))`;
-          if (entry.isWinner && raw >= 1) winnerDone = true;
         });
 
-        if (winnerDone) {
+        if (winnerCrossedAt !== null && elapsed - winnerCrossedAt >= VICTORY_RUN_MS) {
           resolve();
           return;
         }
+
         requestAnimationFrame(tick);
       }
 
@@ -527,6 +642,7 @@
   async function startRace() {
     if (racing || !currentSlug) return;
 
+    audio.prime();
     racing = true;
     setControlsDisabled(true);
     winnerBox.hidden = true;
@@ -563,6 +679,7 @@
     }
 
     statusEl.textContent = "Corrida em andamento...";
+    audio.playStart();
     await animateRace(data.winner.id);
 
     const label = `🏆 Vencedor(a): ${data.winner.name} #${data.winner.id}`;
@@ -575,8 +692,6 @@
     setControlsDisabled(false);
   }
 
-  // Combining Diacritical Marks block (U+0300-U+036F), built from char codes instead of
-  // a \u escape literal so accented source ambiguity can't creep back in here.
   const COMBINING_MARKS_RE = new RegExp(
     `[${String.fromCharCode(0x0300)}-${String.fromCharCode(0x036f)}]`,
     "g"
@@ -661,6 +776,13 @@
 
   startButton.addEventListener("click", startRace);
 
+  muteButton.addEventListener("click", function () {
+    const nextMuted = !audio.isMuted();
+    audio.setMuted(nextMuted);
+    muteButton.textContent = nextMuted ? "🔇 Som desligado" : "🔊 Som ligado";
+    muteButton.setAttribute("aria-pressed", nextMuted ? "true" : "false");
+  });
+
   loginForm.addEventListener("submit", async function (event) {
     event.preventDefault();
 
@@ -681,7 +803,6 @@
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           email,
-          purpose: "admin",
           captchaId: captcha.getToken(),
           captcha: Number(captcha.getAnswer())
         })

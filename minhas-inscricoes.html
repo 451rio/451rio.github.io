@@ -91,6 +91,20 @@ sitemap: false
     </div>
     <div class="subscription-list" id="subscription-list" role="region" aria-live="polite" aria-label="Lista de inscrições"></div>
   </section>
+
+  <section class="meetup-card" id="admin-checkin-section" hidden>
+    <div class="account-bar">
+      <div>
+        <h2>Check-in da organização</h2>
+        <p class="meetup-subtitle" id="admin-checkin-status" role="status" aria-live="polite">
+          Aponte a câmera para o QR code da pessoa.
+        </p>
+      </div>
+      <a class="btn btn-ghost" href="{{ '/sorteio/' | relative_url }}">Sorteio</a>
+    </div>
+    <video id="admin-checkin-video" class="checkin-video" playsinline muted></video>
+    <div id="admin-checkin-result" class="checkin-result" role="status" aria-live="polite"></div>
+  </section>
 </main>
 
 <div class="modal" id="checkinModal" aria-hidden="true">
@@ -132,5 +146,6 @@ sitemap: false
 </div>
 
 <script src="{{ '/assets/js/vendor/qrcode.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/vendor/jsQR.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/form-utils.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/meetup-subscriptions.js' | relative_url }}"></script>

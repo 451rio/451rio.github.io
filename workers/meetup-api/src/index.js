@@ -212,18 +212,6 @@ async function encryptField(value, env) {
   return bytesToBase64(payload);
 }
 
-async function decryptField(encryptedPayload, env) {
-  const key = await importAesKey(env);
-  const payload = base64ToBytes(encryptedPayload);
-  if (payload.byteLength <= 12) {
-    throw new Error("Invalid encrypted document payload");
-  }
-  const iv = payload.slice(0, 12);
-  const cipher = payload.slice(12);
-  const plainBuffer = await crypto.subtle.decrypt({name: "AES-GCM", iv}, key, cipher);
-  return new TextDecoder().decode(plainBuffer);
-}
-
 async function importHmacKey(env) {
   if (!env.DOC_ENCRYPTION_KEY_BASE64) {
     throw new Error("DOC_ENCRYPTION_KEY_BASE64 secret is required");
@@ -688,9 +676,6 @@ function randomHex(byteLength) {
   return Array.from(buf, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-// Unbiased random integer in [0, count), by rejection sampling over the Uint32
-// space instead of `crypto.getRandomValues() % count` — the naive modulo favors
-// the low end whenever count doesn't evenly divide 2^32.
 function randomIndexBelow(count) {
   const limit = Math.floor(0x100000000 / count) * count;
   const buf = new Uint32Array(1);
@@ -920,7 +905,6 @@ async function handleMagicLinkRequest(request, env, corsOrigin, ctx) {
   const body = parsed.body;
 
   const email = String(body.email || "").trim().toLowerCase();
-  const purpose = String(body.purpose || "").trim() === "admin" ? "admin" : "subscriber";
   const captchaId = String(body.captchaId || "");
   const captchaValue = Number(body.captcha);
 
@@ -959,15 +943,14 @@ async function handleMagicLinkRequest(request, env, corsOrigin, ctx) {
       );
     }
 
-    const authorized =
-      purpose === "admin"
-        ? isAdminEmail(email, env)
-        : Number(
-            (await env.DB
-              .prepare("SELECT COUNT(*) AS total FROM registrations WHERE email = ?")
-              .bind(email)
-              .first())?.total || 0
-          ) > 0;
+    const hasRegistration =
+      Number(
+        (await env.DB
+          .prepare("SELECT COUNT(*) AS total FROM registrations WHERE email = ?")
+          .bind(email)
+          .first())?.total || 0
+      ) > 0;
+    const authorized = hasRegistration || isAdminEmail(email, env);
 
     if (!authorized) {
       await env.DB
@@ -987,8 +970,7 @@ async function handleMagicLinkRequest(request, env, corsOrigin, ctx) {
       .bind(emailHash, email, tokenHash, `+${MAGIC_LINK_TTL_MINUTES} minutes`)
       .run();
 
-    const redirectPath = purpose === "admin" ? "/checkin/" : "/minhas-inscricoes/";
-    const link = `${getSiteBaseUrl(env)}${redirectPath}?token=${encodeURIComponent(token)}`;
+    const link = `${getSiteBaseUrl(env)}/minhas-inscricoes/?token=${encodeURIComponent(token)}`;
     const message = buildMagicLinkEmail(link);
 
     runInBackground(ctx, () =>

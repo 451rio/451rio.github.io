@@ -354,7 +354,6 @@ export function buildCertificatePdf(certificate) {
   const contentBytes = encoder.encode(content.toString());
 
   const objects = [];
-  const ref = (index) => `${index} 0 R`;
 
   objects.push({dict: "<< /Type /Catalog /Pages 2 0 R >>"});
   objects.push({dict: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"});

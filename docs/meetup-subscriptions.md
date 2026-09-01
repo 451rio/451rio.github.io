@@ -18,7 +18,8 @@ This project keeps a static Jekyll frontend and uses Cloudflare Workers + D1 for
 - Certificate validation page: `certificado.html` + `assets/js/certificate.js`
 - Certificate PDF generator: `workers/meetup-api/src/pdf.js` + `src/certificate-assets.js`
 - Public ranking: `ranking.html` + `assets/js/ranking.js`
-- Check-in scanner (admin-only): `checkin.html` + `assets/js/checkin.js`
+- Check-in scanner (admin-only): a section inside `minhas-inscricoes.html`, revealed by
+  `assets/js/meetup-subscriptions.js` only when `/api/me/admin-status` says so
 - Duck race raffle (admin-only): `sorteio.html` + `assets/js/sorteio.js`
 - Shared navigation: `_includes/nav.html` (carries the "Minha conta" link on every page)
 - Worker API: `workers/meetup-api/src/index.js`
@@ -226,6 +227,12 @@ Behavior:
 
 - Always answers `200` with the same generic message, so the endpoint cannot be used
   to discover which addresses have registrations.
+- A token is issued when the address **either** has registrations **or** is in
+  `ADMIN_EMAILS`. There is a single login for the whole account area: an organiser who
+  never signed up for a meetup still needs to reach the check-in scanner that now lives
+  inside `/minhas-inscricoes/`. Both branches answer with the same message and take the
+  same path, so widening the rule adds no enumeration channel — and it grants nothing on
+  its own: every admin action re-checks `isAdminEmail(session.email)` server-side.
 - Every attempt is recorded by `email_hash`; more than 3 attempts in 15 minutes
   returns `429` (the counter is independent of whether registrations exist).
 - A token is only generated and e-mailed when the address has registrations.
@@ -362,10 +369,10 @@ Requires `Authorization: Bearer <session token>`. Revokes the session.
 
 ## Duck race raffle (admin, `0024`)
 
-`/sorteio/` reuses the check-in login (`purpose: "admin"` on `/api/auth/magic-link`,
-gated by `ADMIN_EMAILS`) and the same bearer session as `/checkin/` — the two pages share
-the `hib.checkin.session` key in `sessionStorage`, so logging in once opens both for the
-rest of the tab.
+`/sorteio/` reuses the account login and the same bearer session as `/minhas-inscricoes/` —
+both pages share the `hib.subscriptions.session` key in `sessionStorage`, so logging in once
+opens both for the rest of the tab. Access itself is decided per request by `ADMIN_EMAILS`,
+never by which page issued the call.
 
 ### `GET /api/admin/meetups`
 

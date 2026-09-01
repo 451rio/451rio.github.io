@@ -33,7 +33,7 @@ sitemap: false
       </div>
     </form>
     <p class="meetup-subtitle">O link de acesso abre no check-in. Depois de entrar, volte para esta página.
-      Já tem sessão aberta? <a href="{{ '/checkin/' | relative_url }}">Ir para o check-in</a>.</p>
+      Já tem sessão aberta? <a href="{{ '/minhas-inscricoes/' | relative_url }}">Ir para a minha conta</a>.</p>
   </section>
 
   <section class="meetup-card" id="duckrace-denied-section" hidden>
@@ -48,7 +48,7 @@ sitemap: false
         <p class="meetup-subtitle">Sorteia, entre quem já fez check-in, um vencedor por corrida.</p>
       </div>
       <div class="duckrace-header-actions">
-        <a class="btn btn-ghost" href="{{ '/checkin/' | relative_url }}">Check-in</a>
+        <a class="btn btn-ghost" href="{{ '/minhas-inscricoes/' | relative_url }}">Check-in</a>
         <button class="btn btn-ghost" type="button" id="duckrace-logout-button">Sair</button>
       </div>
     </div>
@@ -69,6 +69,7 @@ sitemap: false
 
     <div class="duckrace-actions">
       <button class="btn btn-primary" type="button" id="duckrace-start-button" disabled>Iniciar corrida</button>
+      <button class="btn btn-ghost" type="button" id="duckrace-mute-button" aria-pressed="false">🔊 Som ligado</button>
     </div>
 
     <div class="duckrace-winner checkin-success" id="duckrace-winner" hidden role="status" aria-live="polite"></div>

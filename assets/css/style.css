@@ -2241,14 +2241,16 @@ footer a {
   border-radius: 14px;
   border: 1px solid var(--border-soft);
   background:
-    repeating-linear-gradient(120deg, rgba(255, 255, 255, 0.035) 0 2px, transparent 2px 42px),
-    linear-gradient(180deg, #1c5570 0%, #123a4a 100%);
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px 40px),
+    linear-gradient(180deg,
+      #5cb85c 0%, #5cb85c 7%,
+      #3f8f3f 7%, #3f8f3f 9%,
+      #6b4423 9%, #6b4423 12%,
+      #3a7ca5 12%, #2c5f82 100%
+    );
   overflow: hidden;
 }
 
-/* Three fixed density tiers (set as `data-density` by sorteio.js from the racer count)
-   instead of a size-to-fit formula — a pond with ~100 racers needs a hard floor on font
-   and icon size, which a smooth scale-to-fit curve would eventually shrink past. */
 .duckrace-lanes {
   --duckrace-lane-h: 46px;
   --duckrace-name-size: 0.72rem;
@@ -2342,6 +2344,8 @@ footer a {
 
 .duckrace-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   justify-content: center;
   margin-top: 1rem;
 }

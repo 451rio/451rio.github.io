@@ -44,6 +44,11 @@
   const feedbackTitle = document.getElementById("subscription-feedback-title");
   const feedbackMessage = document.getElementById("subscription-feedback-message");
 
+  const adminSection = document.getElementById("admin-checkin-section");
+  const adminStatus = document.getElementById("admin-checkin-status");
+  const adminVideo = document.getElementById("admin-checkin-video");
+  const adminResult = document.getElementById("admin-checkin-result");
+
   const requiredNodes = [
     loadingSection, loadingStatus, retryButton,
     loginSection, loginStatus, loginForm, loginEmail, loginSubmit, captchaStatus, loginFormFields,
@@ -52,7 +57,8 @@
     listSection, list, accountEmail, logoutButton,
     checkinModal, checkinQrContainer,
     cancelModal, cancelForm, cancelMessage, cancelInput, cancelSubmit, cancelWordLabel,
-    feedbackModal, feedbackTitle, feedbackMessage
+    feedbackModal, feedbackTitle, feedbackMessage,
+    adminSection, adminStatus, adminVideo, adminResult
   ];
   if (requiredNodes.some((node) => !node)) return;
 
@@ -125,6 +131,7 @@
     loginSection.hidden = section !== loginSection;
     listSection.hidden = section !== listSection;
     profileSection.hidden = section !== listSection;
+    if (section !== listSection) adminSection.hidden = true;
   }
 
   function formatXp(xp) {
@@ -187,6 +194,7 @@
   }
 
   function showLogin(message) {
+    stopAdminScanning();
     showOnly(loginSection);
     retryButton.hidden = true;
     if (message) loginStatus.textContent = message;
@@ -416,6 +424,161 @@
     renderProfile(data.profile);
     renderList(Array.isArray(data.registrations) ? data.registrations : []);
     showOnly(listSection);
+    checkAdminAccess();
+  }
+
+  const ADMIN_RESCAN_COOLDOWN_MS = 4000;
+  const ADMIN_SCAN_INTERVAL_MS = 200;
+  const ADMIN_FLASH_DURATION_MS = 3000;
+
+  let adminScanning = false;
+  let adminScanIntervalId = null;
+  let adminStream = null;
+  let adminLastCode = "";
+  let adminLastCodeAt = 0;
+  let adminBusy = false;
+
+  function stopAdminScanning() {
+    adminScanning = false;
+    adminBusy = false;
+    if (adminScanIntervalId !== null) {
+      window.clearInterval(adminScanIntervalId);
+      adminScanIntervalId = null;
+    }
+    if (adminStream) {
+      adminStream.getTracks().forEach((track) => track.stop());
+      adminStream = null;
+    }
+    adminVideo.srcObject = null;
+    adminSection.hidden = true;
+    if (window.HIBFlash) window.HIBFlash.hide();
+  }
+
+  function showAdminResult(message, kind) {
+    adminResult.textContent = message;
+    adminResult.className = `checkin-result${kind ? ` is-${kind}` : ""}`;
+  }
+
+  function adminFlashAndResume(message, type) {
+    showAdminResult("", "");
+    if (window.HIBFlash) {
+      window.HIBFlash.show(message, type, ADMIN_FLASH_DURATION_MS);
+      window.setTimeout(() => {
+        adminBusy = false;
+      }, ADMIN_FLASH_DURATION_MS);
+    } else {
+      showAdminResult(message, type);
+      adminBusy = false;
+    }
+  }
+
+  async function handleAdminDetectedCode(code) {
+    if (adminBusy) return;
+
+    const now = Date.now();
+    if (code === adminLastCode && now - adminLastCodeAt < ADMIN_RESCAN_COOLDOWN_MS) return;
+    adminLastCode = code;
+    adminLastCodeAt = now;
+    adminBusy = true;
+
+    showAdminResult("Verificando...", "pending");
+
+    let result;
+    try {
+      result = await apiFetch("/api/admin/checkin", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code })
+      });
+    } catch {
+      adminFlashAndResume("Erro de conexão. Tente novamente.", "error");
+      return;
+    }
+
+    const { response, data } = result;
+
+    if (response.status === 401) {
+      stopAdminScanning();
+      setSessionToken("");
+      showLogin(SESSION_EXPIRED_MESSAGE);
+      return;
+    }
+    if (response.status === 403) {
+      stopAdminScanning();
+      return;
+    }
+    if (!response.ok) {
+      adminFlashAndResume(data.error || "Não foi possível confirmar o check-in.", "error");
+      return;
+    }
+
+    const label = data.alreadyCheckedIn
+      ? `✓ ${data.name} já tinha check-in confirmado\n${data.meetupTitle}`
+      : `✓ Check-in confirmado: ${data.name}\n${data.meetupTitle}`;
+    adminFlashAndResume(label, "success");
+  }
+
+  async function adminScanTick(canvas, ctx, detector) {
+    if (!adminScanning || adminBusy || adminVideo.readyState !== adminVideo.HAVE_ENOUGH_DATA) return;
+
+    try {
+      if (detector) {
+        const barcodes = await detector.detect(adminVideo);
+        if (barcodes.length > 0) handleAdminDetectedCode(barcodes[0].rawValue);
+      } else if (window.jsQR) {
+        canvas.width = adminVideo.videoWidth;
+        canvas.height = adminVideo.videoHeight;
+        ctx.drawImage(adminVideo, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const found = window.jsQR(imageData.data, imageData.width, imageData.height);
+        if (found && found.data) handleAdminDetectedCode(found.data);
+      }
+    } catch {
+    }
+  }
+
+  async function startAdminScanning() {
+    adminSection.hidden = false;
+    adminStatus.textContent = "Aponte a câmera para o QR code da pessoa.";
+    showAdminResult("", "");
+
+    try {
+      adminStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    } catch {
+      adminStatus.textContent = "Não foi possível acessar a câmera. Verifique as permissões do navegador.";
+      return;
+    }
+
+    adminVideo.srcObject = adminStream;
+    await adminVideo.play();
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const detector = "BarcodeDetector" in window
+      ? new window.BarcodeDetector({ formats: ["qr_code"] })
+      : null;
+
+    adminScanning = true;
+    adminScanIntervalId = window.setInterval(() => adminScanTick(canvas, ctx, detector), ADMIN_SCAN_INTERVAL_MS);
+  }
+
+  async function checkAdminAccess() {
+    if (adminScanning) return;
+
+    let result;
+    try {
+      result = await apiFetch("/api/me/admin-status", { method: "GET" });
+    } catch {
+      return;
+    }
+
+    const { response, data } = result;
+    if (!response.ok || !data.isAdmin) {
+      adminSection.hidden = true;
+      return;
+    }
+
+    startAdminScanning();
   }
 
   const CHECKIN_POLL_INTERVAL_MS = 3000;

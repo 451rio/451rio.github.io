@@ -1,6 +1,7 @@
 .gem/
 _site/
 .wrangler/
+node_modules/
 workers/meetup-api/node_modules/
 .DS_Store
 

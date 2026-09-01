@@ -87,8 +87,8 @@ Também agenda e envia e-mails de confirmação com atraso de 10 minutos.
 ## Corrida de patos (sorteio, `0024`)
 
 - Área restrita em `/sorteio/` (`sorteio.html` + `assets/js/sorteio.js`), com o mesmo login
-  sem senha do check-in (`purpose: "admin"`) — a sessão do bearer token é compartilhada
-  entre `/checkin/` e `/sorteio/` na mesma aba.
+  sem senha da área de conta — a sessão do bearer token é compartilhada entre
+  `/minhas-inscricoes/` e `/sorteio/` na mesma aba.
 - O organizador escolhe o meetup num dropdown; a lista de "patos" elegíveis é sempre quem
   já fez check-in **naquele** meetup e ainda não ganhou uma corrida anterior da mesma edição.
 - Cada sorteio grava uma linha em `raffle_winners` (`meetup_slug`, `registration_id`, `name`,
@@ -151,7 +151,8 @@ npx wrangler secret put ADMIN_EMAILS
 
 `DOC_ENCRYPTION_KEY_BASE64` deve ser uma chave AES-256 em Base64 (32 bytes).
 `RESEND_API_KEY` é a chave privada da API do Resend.
-`ADMIN_EMAILS` é a lista de e-mails com acesso à área de check-in (`/checkin/`), separados por
+`ADMIN_EMAILS` é a lista de e-mails com acesso às ferramentas da organização (check-in dentro
+de `/minhas-inscricoes/` e o sorteio em `/sorteio/`), separados por
 vírgula caso haja mais de um. Fica como secret (e não em `[vars]`) porque este repositório é
 público — nunca vai para o `wrangler.toml`.
 
