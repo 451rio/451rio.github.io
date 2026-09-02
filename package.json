@@ -5,7 +5,10 @@
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "lint:css": "stylelint \"assets/css/**/*.css\"",
+    "lint:all": "npm run lint && npm run lint:css",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"
   },
   "devDependencies": {
@@ -14,6 +17,8 @@
     "eslint": "^9.17.0",
     "globals": "^15.14.0",
     "jsdom": "^24.1.3",
+    "stylelint": "^16.26.1",
+    "stylelint-config-recommended": "^14.0.1",
     "vitest": "^2.1.8"
   }
 }

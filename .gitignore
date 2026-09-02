@@ -3,6 +3,7 @@ _site/
 .wrangler/
 node_modules/
 workers/meetup-api/node_modules/
+coverage/
 .DS_Store
 
 # Wrangler local secrets — never commit
