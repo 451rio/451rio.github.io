@@ -37,6 +37,7 @@ exclude:
   - docs
   - workers
   - node_modules
+  - coverage
   - tests
   - package.json
   - package-lock.json

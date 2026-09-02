@@ -19,6 +19,41 @@ const OTHER_MIN_MS = readConstant("OTHER_MIN_MS");
 const OTHER_MAX_MS = readConstant("OTHER_MAX_MS");
 const START_STAGGER_MS = readConstant("START_STAGGER_MS");
 
+function extractFunction(name) {
+  const start = SORTEIO_SRC.indexOf(`function ${name}(`);
+  if (start === -1) throw new Error(`function ${name} not found in sorteio.js`);
+
+  let depth = 0;
+  let seenBrace = false;
+
+  for (let i = start; i < SORTEIO_SRC.length; i += 1) {
+    const char = SORTEIO_SRC[i];
+    if (char === "{") {
+      depth += 1;
+      seenBrace = true;
+    } else if (char === "}") {
+      depth -= 1;
+      if (seenBrace && depth === 0) {
+        return SORTEIO_SRC.slice(start, i + 1);
+      }
+    }
+  }
+
+  throw new Error(`could not delimit function ${name}`);
+}
+
+const raceProgress = new Function(`${extractFunction("raceProgress")}; return raceProgress;`)();
+const hashSeed = new Function(`${extractFunction("hashSeed")}; return hashSeed;`)();
+
+function extractEntryShape() {
+  const start = SORTEIO_SRC.indexOf("entries.push({");
+  const end = SORTEIO_SRC.indexOf("});", start);
+  if (start === -1 || end === -1) throw new Error("entry shape not found in animateRace");
+  return SORTEIO_SRC.slice(start, end);
+}
+
+const ENTRY_SHAPE = extractEntryShape();
+
 function makeEntry(isWinner) {
   return {
     finishTime: isWinner
@@ -35,18 +70,23 @@ function makeEntry(isWinner) {
   };
 }
 
-function raceProgress(entry, elapsed) {
-  const span = Math.max(1, entry.finishTime - entry.startDelay);
-  const u = Math.min(1, Math.max(0, (elapsed - entry.startDelay) / span));
-  if (u <= 0) return 0;
-  if (u >= 1) return 1;
+describe("the tests exercise the shipped implementation", () => {
+  it("runs the real raceProgress, not a copy kept in the test file", () => {
+    expect(extractFunction("raceProgress")).toContain("envelope");
+    expect(typeof raceProgress).toBe("function");
+  });
 
-  const envelope = Math.sin(Math.PI * u);
-  const surge = entry.surgeAmp * Math.sin(2 * Math.PI * entry.surgeFreq * u + entry.surgePhase) * envelope;
-  const ripple = entry.rippleAmp * Math.sin(2 * Math.PI * entry.rippleFreq * u + entry.ripplePhase) * envelope;
+  it("builds entries with every field the real animation assigns", () => {
+    const entry = makeEntry(true);
+    const fields = ["finishTime", "startDelay", "surgeAmp", "surgeFreq", "surgePhase", "rippleAmp", "rippleFreq", "ripplePhase"];
 
-  return Math.min(1, Math.max(0, u + surge + ripple));
-}
+    for (const field of fields) {
+      const assigned = new RegExp(`\\b${field}\\s*[:,]`).test(ENTRY_SHAPE);
+      expect(assigned, `animateRace no longer sets ${field}`).toBe(true);
+      expect(entry[field], `test entry is missing ${field}`).toBeTypeOf("number");
+    }
+  });
+});
 
 describe("race timing bands", () => {
   it("keeps the winner band strictly faster than the field", () => {
@@ -133,15 +173,6 @@ describe("race animation guarantees", () => {
 });
 
 describe("duck skin generation", () => {
-  function hashSeed(value) {
-    let hash = 5381;
-    const str = String(value);
-    for (let i = 0; i < str.length; i += 1) {
-      hash = ((hash << 5) + hash + str.charCodeAt(i)) >>> 0;
-    }
-    return hash;
-  }
-
   const COLORS = SORTEIO_SRC.match(/const DUCK_COLORS = \[([\s\S]*?)\];/)[1]
     .match(/"#[0-9a-fA-F]{6}"/g)
     .map((value) => value.replace(/"/g, ""));

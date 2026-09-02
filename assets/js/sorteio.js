@@ -744,7 +744,11 @@
     try {
       ({ response, data } = await apiFetch(
         `/api/admin/meetups/${encodeURIComponent(currentSlug)}/duck-race/reset`,
-        { method: "POST" }
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ confirmation: resetInput.value })
+        }
       ));
     } catch {
       closeResetModal();

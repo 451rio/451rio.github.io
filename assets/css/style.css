@@ -2083,64 +2083,6 @@ footer a {
     padding: 1.1rem;
   }
 
-  .btn {
-    min-height: 44px;
-  }
-
-  .duckrace-pond {
-    --duckrace-finish-w: 20px;
-    touch-action: pan-y;
-    user-select: none;
-  }
-
-  .duckrace-lanes {
-    --duckrace-name-max-w: 6.5rem;
-    --duckrace-name-size: 0.58rem;
-    --duckrace-duck-w: 1.9rem;
-    --duckrace-lane-h: 38px;
-  }
-
-  .duckrace-lanes[data-density="cozy"] {
-    --duckrace-name-max-w: 5rem;
-    --duckrace-name-size: 0.52rem;
-    --duckrace-duck-w: 1.5rem;
-    --duckrace-lane-h: 28px;
-  }
-
-  .duckrace-lanes[data-density="compact"] {
-    --duckrace-name-max-w: 4rem;
-    --duckrace-name-size: 0.46rem;
-    --duckrace-duck-w: 1.1rem;
-    --duckrace-lane-h: 20px;
-  }
-
-  .duckrace-finish-label {
-    font-size: 0.6rem;
-  }
-
-  .duckrace-actions .btn,
-  .duckrace-reset-row .btn {
-    flex: 1 1 auto;
-    white-space: normal;
-  }
-
-  .duckrace-winners-list li {
-    gap: 0.4rem;
-  }
-
-  .duckrace-winner-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .account-bar .duckrace-header-actions {
-    width: 100%;
-  }
-
-  .account-bar .duckrace-header-actions .btn {
-    flex: 1 1 auto;
-  }
 }
 
 @media (max-width: 400px) {
@@ -2487,14 +2429,17 @@ footer a {
   line-height: 1.35;
   white-space: pre-line;
   opacity: 0;
+  visibility: hidden;
   transform: scale(0.96);
-  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out, visibility 0s linear 0.25s;
   pointer-events: none;
 }
 
 .flash-message.is-visible {
   opacity: 1;
+  visibility: visible;
   transform: scale(1);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out, visibility 0s;
 }
 
 .flash-message.is-success {
@@ -2510,4 +2455,65 @@ footer a {
 .flash-message.is-info {
   background: rgba(11, 20, 26, 0.94);
   color: var(--text-main);
+}
+
+@media (max-width: 720px) {
+  .btn {
+    min-height: 44px;
+  }
+
+  .duckrace-pond {
+    --duckrace-finish-w: 20px;
+    touch-action: pan-y;
+    user-select: none;
+  }
+
+  .duckrace-lanes {
+    --duckrace-name-max-w: 6.5rem;
+    --duckrace-name-size: 0.58rem;
+    --duckrace-duck-w: 1.9rem;
+    --duckrace-lane-h: 38px;
+  }
+
+  .duckrace-lanes[data-density="cozy"] {
+    --duckrace-name-max-w: 5rem;
+    --duckrace-name-size: 0.52rem;
+    --duckrace-duck-w: 1.5rem;
+    --duckrace-lane-h: 28px;
+  }
+
+  .duckrace-lanes[data-density="compact"] {
+    --duckrace-name-max-w: 4rem;
+    --duckrace-name-size: 0.46rem;
+    --duckrace-duck-w: 1.1rem;
+    --duckrace-lane-h: 20px;
+  }
+
+  .duckrace-finish-label {
+    font-size: 0.6rem;
+  }
+
+  .duckrace-actions .btn,
+  .duckrace-reset-row .btn {
+    flex: 1 1 auto;
+    white-space: normal;
+  }
+
+  .duckrace-winners-list li {
+    gap: 0.4rem;
+  }
+
+  .duckrace-winner-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .account-bar .duckrace-header-actions {
+    width: 100%;
+  }
+
+  .account-bar .duckrace-header-actions .btn {
+    flex: 1 1 auto;
+  }
 }

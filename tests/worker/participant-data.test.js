@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import worker from "../../workers/meetup-api/src/index.js";
 import {
   createEnv,
@@ -8,7 +8,8 @@ import {
   seedMeetup,
   seedRegistration,
   seedSession,
-  authHeaders
+  authHeaders,
+  stubEmailSending
 } from "../helpers/worker-env.js";
 
 const ALICE = "alice@example.com";
@@ -18,11 +19,17 @@ const SLUG = "meetup-teste";
 describe("participant data isolation", () => {
   let env;
   let ctx;
+  let mail;
 
   beforeEach(() => {
     env = createEnv();
     ctx = createCtx();
+    mail = stubEmailSending();
     seedMeetup(env);
+  });
+
+  afterEach(() => {
+    mail.restore();
   });
 
   it("only returns the registrations of the session's own email", async () => {
@@ -233,11 +240,17 @@ describe("participant data isolation", () => {
 describe("public endpoints", () => {
   let env;
   let ctx;
+  let mail;
 
   beforeEach(() => {
     env = createEnv();
     ctx = createCtx();
+    mail = stubEmailSending();
     seedMeetup(env);
+  });
+
+  afterEach(() => {
+    mail.restore();
   });
 
   it("never leaks personal data through the meetup status endpoint", async () => {

@@ -206,8 +206,14 @@ Validation:
 Responses:
 
 - `201` success
-- `409` when full or duplicate email
+- `409` when the meetup is full or closed
 - `400` validation errors
+
+A **duplicate** e-mail also answers `201`, with the same body as a first-time
+registration. That is deliberate: a distinct answer would turn this endpoint into a way
+to ask "is this person going to the meetup?". The unique index still rejects the row, so
+the duplicate is neither stored nor charged a seat — the caller simply cannot tell the
+two cases apart.
 
 Side effect:
 
@@ -235,7 +241,6 @@ Behavior:
   its own: every admin action re-checks `isAdminEmail(session.email)` server-side.
 - Every attempt is recorded by `email_hash`; more than 3 attempts in 15 minutes
   returns `429` (the counter is independent of whether registrations exist).
-- A token is only generated and e-mailed when the address has registrations.
 - Token: 32 random bytes, base64url. Only its SHA-256 hash is stored.
 - Link format: `<SITE_BASE_URL>/minhas-inscricoes/?token=<token>`, valid for 15 minutes, single use.
 - The e-mail is sent immediately through Resend (it does not go through `email_jobs`).

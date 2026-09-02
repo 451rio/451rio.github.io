@@ -8,6 +8,7 @@ database_name = "meetup_db"
 database_id = "e3d3e3e7-2ba1-47f8-a4a3-6c34bd1e7ebc"
 
 [vars]
+DAILY_EMAIL_CAP = "400"
 ALLOWED_ORIGIN = "https://hackinbrasil.com.br,https://www.hackinbrasil.com.br"
 SITE_BASE_URL = "https://hackinbrasil.com.br"
 RESEND_FROM_EMAIL = "Hack in Brasil <contato@hackinbrasil.com.br>"

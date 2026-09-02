@@ -162,6 +162,51 @@ describe("email queue processing", () => {
     expect(job.last_error).toContain("todos os reagendamentos");
   });
 
+  it("honours a raised cap from the environment instead of the hardcoded default", async () => {
+    env.DAILY_EMAIL_CAP = "150";
+
+    for (let i = 0; i < 120; i += 1) {
+      env.DB.raw.prepare("INSERT INTO email_sends (kind) VALUES ('confirmation')").run();
+    }
+
+    queueJob(env);
+    await runCron(env);
+
+    expect(resend.calls.length).toBe(1);
+    expect(jobRows(env)[0].status).toBe("sent");
+  });
+
+  it("still stops once the raised cap itself is reached", async () => {
+    env.DAILY_EMAIL_CAP = "150";
+
+    for (let i = 0; i < 150; i += 1) {
+      env.DB.raw.prepare("INSERT INTO email_sends (kind) VALUES ('confirmation')").run();
+    }
+
+    queueJob(env);
+    await runCron(env);
+
+    expect(resend.calls.length).toBe(0);
+    expect(jobRows(env)[0].cap_retries).toBe(1);
+  });
+
+  it("falls back to the safe default when the variable is missing or nonsense", async () => {
+    for (const value of [undefined, "", "abc", "0", "-5"]) {
+      const scenario = createEnv();
+      seedMeetup(scenario);
+      if (value !== undefined) scenario.DAILY_EMAIL_CAP = value;
+
+      for (let i = 0; i < 100; i += 1) {
+        scenario.DB.raw.prepare("INSERT INTO email_sends (kind) VALUES ('confirmation')").run();
+      }
+
+      queueJob(scenario);
+      await runCron(scenario);
+
+      expect(jobRows(scenario)[0].status, `cap=${String(value)}`).toBe("pending");
+    }
+  });
+
   it("counts immediate sends against the same daily budget", async () => {
     const before = sendsToday(env);
     queueJob(env);
@@ -182,6 +227,66 @@ describe("email queue processing", () => {
 
     expect(resend.calls.length).toBeLessThanOrEqual(2);
     expect(sendsToday(env)).toBeLessThanOrEqual(100);
+  });
+});
+
+describe("jobs interrupted mid-send are not lost", () => {
+  let env;
+  let resend;
+
+  beforeEach(() => {
+    env = createEnv();
+    seedMeetup(env);
+    resend = stubResend();
+  });
+
+  afterEach(() => {
+    resend.restore();
+  });
+
+  function stuckJob(minutesAgo, attempts = 1) {
+    queueJob(env, { status: "processing", attempts });
+    env.DB.raw
+      .prepare("UPDATE email_jobs SET updated_at = datetime('now', ?) WHERE id = (SELECT MAX(id) FROM email_jobs)")
+      .run(`-${minutesAgo} minutes`);
+  }
+
+  it("requeues and delivers a job left stuck in processing", async () => {
+    stuckJob(30);
+
+    await runCron(env);
+
+    expect(resend.calls.length).toBe(1);
+    expect(jobRows(env)[0].status).toBe("sent");
+  });
+
+  it("leaves a job that is still being worked on alone", async () => {
+    stuckJob(1);
+
+    await runCron(env);
+
+    expect(resend.calls.length).toBe(0);
+    expect(jobRows(env)[0].status).toBe("processing");
+  });
+
+  it("gives up on a stuck job that already burned every attempt", async () => {
+    stuckJob(30, 5);
+
+    await runCron(env);
+
+    const job = jobRows(env)[0];
+    expect(job.status).toBe("failed");
+    expect(job.last_error).toContain("tentativas esgotadas");
+    expect(resend.calls.length).toBe(0);
+  });
+
+  it("does not resurrect a job that already went out", async () => {
+    queueJob(env, { status: "sent" });
+
+    await runCron(env);
+
+    expect(resend.calls.length).toBe(0);
+    expect(jobRows(env)[0].status).toBe("sent");
   });
 });
 

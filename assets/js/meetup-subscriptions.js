@@ -563,7 +563,10 @@
   }
 
   async function checkAdminAccess() {
-    if (adminScanning) return;
+    if (adminScanning) {
+      adminSection.hidden = false;
+      return;
+    }
 
     let result;
     try {
@@ -580,6 +583,14 @@
 
     startAdminScanning();
   }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      if (adminScanning) stopAdminScanning();
+      return;
+    }
+    if (!listSection.hidden && getSessionToken()) checkAdminAccess();
+  });
 
   const CHECKIN_POLL_INTERVAL_MS = 3000;
   let checkinPollId = null;

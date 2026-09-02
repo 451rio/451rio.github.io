@@ -54,15 +54,29 @@ describe("duck race eligibility and draws", () => {
   });
 
   it("never draws someone who did not check in", async () => {
-    seedRegistration(env, { email: "a@example.com", name: "Com check-in", checked_in_at: "2026-09-03 20:00:00" });
-    seedRegistration(env, { email: "b@example.com", name: "Sem check-in", checked_in_at: null });
+    for (let i = 0; i < 5; i += 1) {
+      seedRegistration(env, {
+        email: `sem-checkin-${i}@example.com`,
+        name: `Sem check-in ${i}`,
+        checked_in_at: null
+      });
+      seedRegistration(env, {
+        email: `com-checkin-${i}@example.com`,
+        name: `Com check-in ${i}`,
+        checked_in_at: "2026-09-03 20:00:00"
+      });
+    }
 
+    const drawn = [];
     for (let i = 0; i < 5; i += 1) {
       const response = await draw(env, ctx, token);
-      if (response.status === 200) {
-        const { winner } = await response.json();
-        expect(winner.name).toBe("Com check-in");
-      }
+      expect(response.status).toBe(200);
+      drawn.push((await response.json()).winner.name);
+    }
+
+    expect(drawn.length).toBe(5);
+    for (const name of drawn) {
+      expect(name).toMatch(/^Com check-in /);
     }
   });
 
@@ -77,7 +91,8 @@ describe("duck race eligibility and draws", () => {
     expect(after.ducks.map((d) => d.id)).not.toContain(winner.id);
     expect(after.ducks.length).toBe(1);
     expect(after.winners.map((w) => w.id)).toEqual([winner.id]);
-    expect([first.id]).toBeTruthy();
+    expect([first.id, winner.id]).toContain(winner.id);
+    expect(Number.isInteger(first.id)).toBe(true);
   });
 
   it("cannot draw the same person twice across many draws", async () => {
@@ -142,7 +157,7 @@ describe("duck race eligibility and draws", () => {
     await draw(env, ctx, token, "outro-meetup");
 
     const reset = await worker.fetch(
-      jsonRequest(`https://api.test/api/admin/meetups/${SLUG}/duck-race/reset`, {}, {
+      jsonRequest(`https://api.test/api/admin/meetups/${SLUG}/duck-race/reset`, { confirmation: "RESETAR" }, {
         headers: authHeaders(token)
       }),
       env,
@@ -173,7 +188,7 @@ describe("duck race eligibility and draws", () => {
       const response = await draw(env, ctx, token);
       firstPicks.add((await response.json()).winner.id);
       await worker.fetch(
-        jsonRequest(`https://api.test/api/admin/meetups/${SLUG}/duck-race/reset`, {}, {
+        jsonRequest(`https://api.test/api/admin/meetups/${SLUG}/duck-race/reset`, { confirmation: "RESETAR" }, {
           headers: authHeaders(token)
         }),
         env,

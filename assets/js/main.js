@@ -15,6 +15,7 @@ window.HIBFlash = (function () {
   function hide() {
     if (!overlay) return;
     overlay.classList.remove("is-visible");
+    overlay.textContent = "";
   }
 
   function show(message, type, durationMs) {

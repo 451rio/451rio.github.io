@@ -2,6 +2,9 @@
   "name": "hackinbrasil-site",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

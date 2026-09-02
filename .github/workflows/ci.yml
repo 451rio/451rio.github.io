@@ -9,10 +9,15 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   javascript:
     name: Lint e testes
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
 
@@ -21,7 +26,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
 
       - name: Instalar dependências
@@ -39,6 +44,7 @@ jobs:
   site:
     name: Build do site
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
 

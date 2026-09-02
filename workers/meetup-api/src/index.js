@@ -428,8 +428,16 @@ async function markEmailAsFailed(env, jobId, errorText) {
     .run();
 }
 
-const DAILY_EMAIL_CAP = 100;
+const DEFAULT_DAILY_EMAIL_CAP = 100;
 const MAX_CAP_RETRIES = 3;
+const MAX_EMAIL_ATTEMPTS = 5;
+const STALLED_JOB_MINUTES = 15;
+
+function dailyEmailCap(env) {
+  const configured = Number(env.DAILY_EMAIL_CAP);
+  if (!Number.isFinite(configured) || configured <= 0) return DEFAULT_DAILY_EMAIL_CAP;
+  return Math.floor(configured);
+}
 
 const REMINDER_LEAD_DAYS = 5;
 const REMINDER_SEND_HOUR_UTC = 12;
@@ -451,13 +459,43 @@ async function deferJobsOverDailyCap(env) {
     .run();
 }
 
+async function requeueStalledEmailJobs(env) {
+  await env.DB
+    .prepare(
+      `UPDATE email_jobs
+       SET status = 'pending',
+           updated_at = CURRENT_TIMESTAMP,
+           last_error = 'Envio interrompido antes de terminar; recolocado na fila'
+       WHERE status = 'processing'
+         AND updated_at <= datetime('now', ?)
+         AND attempts < ?`
+    )
+    .bind(`-${STALLED_JOB_MINUTES} minutes`, MAX_EMAIL_ATTEMPTS)
+    .run();
+
+  await env.DB
+    .prepare(
+      `UPDATE email_jobs
+       SET status = 'failed',
+           updated_at = CURRENT_TIMESTAMP,
+           last_error = 'Envio interrompido e tentativas esgotadas'
+       WHERE status = 'processing'
+         AND updated_at <= datetime('now', ?)
+         AND attempts >= ?`
+    )
+    .bind(`-${STALLED_JOB_MINUTES} minutes`, MAX_EMAIL_ATTEMPTS)
+    .run();
+}
+
 async function processPendingEmailJobs(env, limit = 20) {
+  await requeueStalledEmailJobs(env);
+
   const sentTodayRow = await env.DB
     .prepare("SELECT COUNT(*) AS total FROM email_sends WHERE date(sent_at) = date('now')")
     .first();
 
   const sentToday = Number(sentTodayRow?.total || 0);
-  const remainingForToday = DAILY_EMAIL_CAP - sentToday;
+  const remainingForToday = dailyEmailCap(env) - sentToday;
   if (remainingForToday <= 0) {
     await deferJobsOverDailyCap(env);
     return;
@@ -496,10 +534,10 @@ async function processPendingEmailJobs(env, limit = 20) {
       await markEmailAsSent(env, job.id, resendEmailId);
     } catch (error) {
       const errorText = truncateError(error?.message || error || "Unknown email sending failure");
-      if (currentAttempt >= 5) {
+      if (currentAttempt >= MAX_EMAIL_ATTEMPTS) {
         await markEmailAsFailed(env, job.id, errorText);
       }
-      if (currentAttempt < 5) {
+      if (currentAttempt < MAX_EMAIL_ATTEMPTS) {
         await markEmailAsRetry(env, job.id, errorText);
       }
     }
@@ -762,6 +800,8 @@ const MAGIC_LINK_WINDOW_MINUTES = 15;
 const MAGIC_LINK_MAX_PER_WINDOW = 3;
 const SESSION_TTL_MINUTES = 30;
 const CANCEL_CONFIRMATION_WORD = "CANCELAR";
+const RESET_CONFIRMATION_WORD = "RESETAR";
+const DRAW_MAX_ATTEMPTS = 5;
 const CERTIFICATE_DELAY_HOURS = 24;
 const CERTIFICATE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const RANKING_LIMIT = 100;
@@ -1429,27 +1469,56 @@ async function handleDuckRaceDraw(env, session, slug, corsOrigin) {
   }
 
   try {
-    const ducks = await loadDuckRaceEligible(env, slug);
-    if (ducks.length === 0) {
-      return json({error: "Não há participantes elegíveis para a corrida."}, 409, corsOrigin);
+    for (let attempt = 0; attempt < DRAW_MAX_ATTEMPTS; attempt += 1) {
+      const ducks = await loadDuckRaceEligible(env, slug);
+      if (ducks.length === 0) {
+        return json({error: "Não há participantes elegíveis para a corrida."}, 409, corsOrigin);
+      }
+
+      const winner = ducks[randomIndexBelow(ducks.length)];
+
+      const claimed = await env.DB
+        .prepare(
+          `INSERT INTO raffle_winners (meetup_slug, registration_id, name)
+           SELECT r.meetup_slug, r.id, r.name FROM registrations r
+           WHERE r.id = ? AND r.meetup_slug = ? AND r.checked_in_at IS NOT NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM raffle_winners w
+               WHERE w.meetup_slug = r.meetup_slug AND w.registration_id = r.id
+             )`
+        )
+        .bind(winner.id, slug)
+        .run();
+
+      if (claimed.meta && claimed.meta.changes === 1) {
+        return json({winner: {id: winner.id, name: winner.name}}, 200, corsOrigin);
+      }
     }
 
-    const winner = ducks[randomIndexBelow(ducks.length)];
-
-    await env.DB
-      .prepare("INSERT INTO raffle_winners (meetup_slug, registration_id, name) VALUES (?, ?, ?)")
-      .bind(slug, winner.id, winner.name)
-      .run();
-
-    return json({winner: {id: winner.id, name: winner.name}}, 200, corsOrigin);
+    return json(
+      {error: "Outro sorteio aconteceu ao mesmo tempo. Tente novamente."},
+      409,
+      corsOrigin
+    );
   } catch (err) {
     return serverError(corsOrigin, "admin:duckRaceDraw", err);
   }
 }
 
-async function handleDuckRaceReset(env, session, slug, corsOrigin) {
+async function handleDuckRaceReset(request, env, session, slug, corsOrigin) {
   if (!isAdminEmail(session.email, env)) {
     return json({error: "Acesso restrito à organização."}, 403, corsOrigin);
+  }
+
+  const parsed = await readJsonBody(request, corsOrigin);
+  if (parsed.error) return parsed.error;
+
+  if (normalizeConfirmation(parsed.body.confirmation) !== RESET_CONFIRMATION_WORD) {
+    return json(
+      {error: `Digite ${RESET_CONFIRMATION_WORD} para confirmar o reset do sorteio.`},
+      400,
+      corsOrigin
+    );
   }
 
   try {
@@ -1567,7 +1636,7 @@ async function remainingEmailsToday(env) {
   const row = await env.DB
     .prepare("SELECT COUNT(*) AS total FROM email_sends WHERE date(sent_at) = date('now')")
     .first();
-  return Math.max(0, DAILY_EMAIL_CAP - Number(row?.total || 0));
+  return Math.max(0, dailyEmailCap(env) - Number(row?.total || 0));
 }
 
 async function queueCertificateEmail(env, certificate, recipientEmail) {
@@ -2491,7 +2560,7 @@ export default {
       );
       if (request.method === "POST" && duckRaceResetMatch) {
         return withSession(request, env, corsOrigin, (session) =>
-          handleDuckRaceReset(env, session, duckRaceResetMatch[1], corsOrigin)
+          handleDuckRaceReset(request, env, session, duckRaceResetMatch[1], corsOrigin)
         );
       }
 

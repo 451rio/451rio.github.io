@@ -104,12 +104,27 @@ export function createEnv(overrides = {}) {
 
 export function createCtx() {
   const pending = [];
+  const failures = [];
+
   return {
     waitUntil(promise) {
-      pending.push(Promise.resolve(promise).catch(() => {}));
+      pending.push(
+        Promise.resolve(promise).catch((error) => {
+          failures.push(error);
+        })
+      );
     },
     async settle() {
       await Promise.all(pending);
+    },
+    async settleStrict() {
+      await Promise.all(pending);
+      if (failures.length > 0) {
+        throw new Error(`background work failed: ${failures.map((e) => e && e.message).join("; ")}`);
+      }
+    },
+    backgroundFailures() {
+      return failures.slice();
     }
   };
 }

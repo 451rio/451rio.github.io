@@ -187,6 +187,14 @@ describe("degraded but not broken", () => {
   it("survives a cron tick with nothing to do", async () => {
     const cronCtx = createCtx();
     await worker.scheduled({}, env, cronCtx);
-    await expect(cronCtx.settle()).resolves.not.toThrow();
+    await cronCtx.settleStrict();
+    expect(cronCtx.backgroundFailures()).toEqual([]);
+  });
+
+  it("surfaces a crash inside cron background work instead of swallowing it", async () => {
+    const cronCtx = createCtx();
+    cronCtx.waitUntil(Promise.reject(new Error("cron work exploded")));
+
+    await expect(cronCtx.settleStrict()).rejects.toThrow("cron work exploded");
   });
 });
