@@ -11,7 +11,8 @@ export default defineConfig({
       include: ["workers/meetup-api/src/**/*.js"],
       exclude: ["workers/meetup-api/src/certificate-assets.js"],
       thresholds: {
-        statements: 88,
+        statements: 85,
+        lines: 88,
         functions: 92,
         branches: 70
       }

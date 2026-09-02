@@ -158,8 +158,8 @@ export function stubEmailSending() {
     const url = typeof input === "string" ? input : input.url;
     let isResendHost = false;
     try {
-      const parsed = new URL(url);
-      isResendHost = parsed.hostname === "resend.com";
+      const { hostname } = new URL(url);
+      isResendHost = hostname === "resend.com" || hostname.endsWith(".resend.com");
     } catch {
       isResendHost = false;
     }
