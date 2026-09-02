@@ -124,6 +124,53 @@ describe("participant data isolation", () => {
     expect(Number(remaining.total)).toBe(0);
   });
 
+  it("cancels cleanly when the registration still has a queued email, instead of reporting 404 and leaking the seat", async () => {
+    const registration = seedRegistration(env, { email: ALICE });
+    env.DB.raw
+      .prepare(
+        `INSERT INTO email_jobs (kind, meetup_slug, registration_id, recipient_name, recipient_email, subject, text_body, html_body, send_after, status)
+         VALUES ('confirmation', ?, ?, 'Alice', ?, 'Assunto', 'corpo', '<p>corpo</p>', datetime('now', '+10 minutes'), 'pending')`
+      )
+      .run(SLUG, registration.id, ALICE);
+
+    const { token } = await seedSession(env, ALICE);
+    const response = await worker.fetch(
+      jsonRequest(`https://api.test/api/me/registrations/${SLUG}/cancel`, { confirmation: "CANCELAR" }, {
+        headers: authHeaders(token)
+      }),
+      env,
+      ctx
+    );
+
+    expect(response.status).toBe(200);
+
+    const registrations = env.DB.raw.prepare("SELECT COUNT(*) AS total FROM registrations").get();
+    const jobs = env.DB.raw.prepare("SELECT COUNT(*) AS total FROM email_jobs").get();
+    const meetup = env.DB.raw.prepare("SELECT registrations_count FROM meetups WHERE slug = ?").get(SLUG);
+
+    expect(Number(registrations.total)).toBe(0);
+    expect(Number(jobs.total)).toBe(0);
+    expect(Number(meetup.registrations_count)).toBe(0);
+  });
+
+  it("leaves an already finished meetup alone", async () => {
+    seedMeetup(env, { slug: "ja-aconteceu", title: "Passado", event_date: "2020-01-10T19:00:00" });
+    seedRegistration(env, { meetup_slug: "ja-aconteceu", email: ALICE });
+    const { token } = await seedSession(env, ALICE);
+
+    const response = await worker.fetch(
+      jsonRequest("https://api.test/api/me/registrations/ja-aconteceu/cancel", { confirmation: "CANCELAR" }, {
+        headers: authHeaders(token)
+      }),
+      env,
+      ctx
+    );
+
+    expect(response.status).toBe(409);
+    const remaining = env.DB.raw.prepare("SELECT COUNT(*) AS total FROM registrations").get();
+    expect(Number(remaining.total)).toBe(1);
+  });
+
   it("recomputes the seat counter instead of blindly decrementing it", async () => {
     env.DB.raw.prepare("UPDATE meetups SET registrations_count = 5 WHERE slug = ?").run(SLUG);
     seedRegistration(env, { email: ALICE });

@@ -2082,6 +2082,65 @@ footer a {
   .blog-article {
     padding: 1.1rem;
   }
+
+  .btn {
+    min-height: 44px;
+  }
+
+  .duckrace-pond {
+    --duckrace-finish-w: 20px;
+    touch-action: pan-y;
+    user-select: none;
+  }
+
+  .duckrace-lanes {
+    --duckrace-name-max-w: 6.5rem;
+    --duckrace-name-size: 0.58rem;
+    --duckrace-duck-w: 1.9rem;
+    --duckrace-lane-h: 38px;
+  }
+
+  .duckrace-lanes[data-density="cozy"] {
+    --duckrace-name-max-w: 5rem;
+    --duckrace-name-size: 0.52rem;
+    --duckrace-duck-w: 1.5rem;
+    --duckrace-lane-h: 28px;
+  }
+
+  .duckrace-lanes[data-density="compact"] {
+    --duckrace-name-max-w: 4rem;
+    --duckrace-name-size: 0.46rem;
+    --duckrace-duck-w: 1.1rem;
+    --duckrace-lane-h: 20px;
+  }
+
+  .duckrace-finish-label {
+    font-size: 0.6rem;
+  }
+
+  .duckrace-actions .btn,
+  .duckrace-reset-row .btn {
+    flex: 1 1 auto;
+    white-space: normal;
+  }
+
+  .duckrace-winners-list li {
+    gap: 0.4rem;
+  }
+
+  .duckrace-winner-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .account-bar .duckrace-header-actions {
+    width: 100%;
+  }
+
+  .account-bar .duckrace-header-actions .btn {
+    flex: 1 1 auto;
+  }
 }
 
 @media (max-width: 400px) {
@@ -2236,6 +2295,7 @@ footer a {
 }
 
 .duckrace-pond {
+  --duckrace-finish-w: 30px;
   position: relative;
   margin-top: 1rem;
   border-radius: 14px;
@@ -2257,7 +2317,7 @@ footer a {
   --duckrace-name-max-w: 11rem;
   --duckrace-duck-w: 2.6rem;
   position: relative;
-  margin-right: 30px;
+  margin-right: var(--duckrace-finish-w, 30px);
 }
 
 .duckrace-lanes[data-density="cozy"] {
@@ -2297,6 +2357,8 @@ footer a {
 }
 
 .duckrace-name {
+  display: flex;
+  align-items: baseline;
   max-width: var(--duckrace-name-max-w);
   padding: 0 0.35rem;
   border-radius: var(--radius-pill);
@@ -2306,8 +2368,17 @@ footer a {
   font-size: var(--duckrace-name-size);
   line-height: 1.5;
   white-space: nowrap;
+}
+
+.duckrace-name-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.duckrace-name-id {
+  flex: none;
+  color: var(--accent);
 }
 
 .duckrace-duck-svg {
@@ -2321,7 +2392,7 @@ footer a {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 30px;
+  width: var(--duckrace-finish-w, 30px);
   background: repeating-conic-gradient(#0b1a20 0% 25%, #f5f7f8 0% 50%) 0 0 / 15px 15px;
   border-left: 1px solid rgba(0, 0, 0, 0.35);
 }

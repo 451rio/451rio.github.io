@@ -135,6 +135,20 @@ describe("duck race rendering", () => {
     expect(names).toEqual(["Ana Silva #11", "Ana Silva #12"]);
   });
 
+  it("keeps the id in its own element so a long name can never truncate it away", async () => {
+    mounted = mountPage({
+      ducks: [{ id: 77, name: "Maria Aparecida da Conceicao dos Santos Nascimento" }]
+    });
+    await sleep(200);
+
+    const tag = mounted.window.document.querySelector(".duckrace-name");
+    const text = tag.querySelector(".duckrace-name-text");
+    const id = tag.querySelector(".duckrace-name-id");
+
+    expect(text.textContent).toBe("Maria Aparecida da Conceicao dos Santos Nascimento");
+    expect(id.textContent.trim()).toBe("#77");
+  });
+
   it("escapes participant names instead of injecting them as markup", async () => {
     mounted = mountPage({
       ducks: [{ id: 1, name: "<img src=x onerror=alert(1)>" }]

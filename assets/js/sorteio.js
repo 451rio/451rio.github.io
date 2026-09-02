@@ -263,7 +263,17 @@
 
       const nameTag = document.createElement("span");
       nameTag.className = "duckrace-name";
-      nameTag.textContent = `${duck.name} #${duck.id}`;
+
+      const nameText = document.createElement("span");
+      nameText.className = "duckrace-name-text";
+      nameText.textContent = duck.name;
+
+      const nameId = document.createElement("span");
+      nameId.className = "duckrace-name-id";
+      nameId.textContent = ` #${duck.id}`;
+
+      nameTag.appendChild(nameText);
+      nameTag.appendChild(nameId);
 
       const duckIconHolder = document.createElement("div");
       duckIconHolder.innerHTML = buildDuckSvg(duckSkinFor(duck.id));
