@@ -67,7 +67,15 @@ function stubResend({ fail = false } = {}) {
 
   globalThis.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input.url;
-    if (!url.includes("resend.com")) throw new Error(`unexpected fetch: ${url}`);
+    let hostname;
+    try {
+      hostname = new URL(url).hostname;
+    } catch {
+      throw new Error(`unexpected fetch: ${url}`);
+    }
+    if (!(hostname === "resend.com" || hostname.endsWith(".resend.com"))) {
+      throw new Error(`unexpected fetch: ${url}`);
+    }
 
     calls.push(init && init.body ? JSON.parse(init.body) : null);
     if (fail) {
