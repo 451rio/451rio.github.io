@@ -373,12 +373,18 @@ async function sendEmailWithResend(env, job) {
     body.attachments = job.attachments;
   }
 
+  const headers = {
+    authorization: `Bearer ${env.RESEND_API_KEY}`,
+    "content-type": "application/json"
+  };
+
+  if (job.id) {
+    headers["Idempotency-Key"] = `job-${job.id}`;
+  }
+
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: {
-      authorization: `Bearer ${env.RESEND_API_KEY}`,
-      "content-type": "application/json"
-    },
+    headers,
     body: JSON.stringify(body)
   });
 
@@ -431,6 +437,21 @@ async function markEmailAsFailed(env, jobId, errorText) {
 const DEFAULT_DAILY_EMAIL_CAP = 100;
 const MAX_CAP_RETRIES = 3;
 const MAX_EMAIL_ATTEMPTS = 5;
+const DEFAULT_NOTIFY_EMAIL_CAP = 20;
+
+function notifyEmailCap(env) {
+  const configured = Number(env.NOTIFY_EMAIL_DAILY_CAP);
+  if (!Number.isFinite(configured) || configured <= 0) return DEFAULT_NOTIFY_EMAIL_CAP;
+  return Math.floor(configured);
+}
+
+async function notifyBudgetLeft(env, kind) {
+  const row = await env.DB
+    .prepare("SELECT COUNT(*) AS total FROM email_sends WHERE kind = ? AND date(sent_at) = date('now')")
+    .bind(kind)
+    .first();
+  return notifyEmailCap(env) - Number(row?.total || 0);
+}
 const STALLED_JOB_MINUTES = 15;
 
 function dailyEmailCap(env) {
@@ -2235,7 +2256,11 @@ async function handleSponsorRegister(request, env, corsOrigin) {
   try {
     const recipient =
       env.SPONSOR_NOTIFY_EMAIL || env.RESEND_REPLY_TO || "contato@hackinbrasil.com.br";
+    if ((await notifyBudgetLeft(env, "sponsor")) <= 0) {
+      throw new Error("Limite diário de notificações de patrocínio atingido");
+    }
     await sendEmailWithResend(env, {
+      kind: "sponsor",
       recipient_email: recipient,
       subject: notify.subject,
       html_body: notify.htmlBody,
@@ -2396,7 +2421,11 @@ async function handleTalkSubmit(request, env, corsOrigin) {
   try {
     const recipient =
       env.TALK_NOTIFY_EMAIL || env.RESEND_REPLY_TO || "contato@hackinbrasil.com.br";
+    if ((await notifyBudgetLeft(env, "talk")) <= 0) {
+      throw new Error("Limite diário de notificações de palestra atingido");
+    }
     await sendEmailWithResend(env, {
+      kind: "talk",
       recipient_email: recipient,
       subject: notify.subject,
       html_body: notify.htmlBody,
