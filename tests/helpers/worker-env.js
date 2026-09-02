@@ -156,7 +156,14 @@ export function stubEmailSending() {
   const original = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input.url;
-    if (url.includes("resend.com")) {
+    let isResendHost = false;
+    try {
+      const parsed = new URL(url);
+      isResendHost = parsed.hostname === "resend.com";
+    } catch {
+      isResendHost = false;
+    }
+    if (isResendHost) {
       sent.push({ url, body: init && init.body ? JSON.parse(init.body) : null });
       return new Response(JSON.stringify({ id: "test-email-id" }), {
         status: 200,
