@@ -62,6 +62,35 @@ describe("responsive overrides actually win the cascade", () => {
     expect(Number(waterStart[1])).toBe(shoreHeight);
   });
 
+  it("stretches the finish strip over the whole pond, including in fullscreen", () => {
+    const pond = CSS.slice(CSS.indexOf(".duckrace-pond {"), CSS.indexOf(".duckrace-lanes {"));
+    const lanes = CSS.slice(CSS.indexOf(".duckrace-lanes {"), CSS.indexOf(".duckrace-lane {"));
+    const finish = CSS.slice(CSS.indexOf(".duckrace-finish {"), CSS.indexOf(".duckrace-finish-label"));
+
+    expect(pond, "o lago precisa ser um container flex em coluna").toContain("flex-direction: column");
+    expect(
+      lanes,
+      "sem crescer, as raias param antes do fim do lago e a tira de chegada fica curta em tela cheia"
+    ).toMatch(/flex:\s*1 0 auto/);
+
+    expect(finish).toContain("position: absolute");
+    expect(finish).toMatch(/top: calc\(-1 \* \(var\(--duckrace-shore-h/);
+    expect(finish).toContain("bottom: -14px");
+  });
+
+  it("fills the screen edge to edge in fullscreen", () => {
+    const stage = CSS.slice(CSS.indexOf(".duckrace-stage:fullscreen {"), CSS.indexOf(".duckrace-stage:fullscreen .duckrace-pond"));
+    const pondFs = CSS.slice(
+      CSS.indexOf(".duckrace-stage:fullscreen .duckrace-pond"),
+      CSS.indexOf(".duckrace-stage:fullscreen #duckrace-status")
+    );
+
+    expect(stage, "recuo no palco deixaria uma faixa sem agua na borda").toMatch(/padding:\s*0;/);
+    expect(pondFs, "o lago precisa esticar").toMatch(/flex:\s*1 1 auto/);
+    expect(pondFs, "canto arredondado deixa a tira de chegada curta na borda").toContain("border-radius: 0");
+    expect(pondFs).toContain("max-height: none");
+  });
+
   it("hides the flash overlay from assistive tech, not just visually", () => {
     const block = CSS.slice(CSS.indexOf(".flash-message {"), CSS.indexOf(".flash-message.is-success"));
     expect(block).toContain("visibility: hidden");

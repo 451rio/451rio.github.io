@@ -2253,6 +2253,8 @@ footer a {
   margin-top: 1rem;
   padding-top: calc(var(--duckrace-shore-h) + 14px);
   padding-bottom: 14px;
+  display: flex;
+  flex-direction: column;
   border-radius: 14px;
   border: 1px solid var(--border-soft);
   background:
@@ -2274,6 +2276,7 @@ footer a {
   --duckrace-name-max-w: 11rem;
   --duckrace-duck-w: 3.2rem;
   position: relative;
+  flex: 1 0 auto;
 }
 
 .duckrace-lane-group {
@@ -2423,7 +2426,7 @@ footer a {
 .duckrace-stage:fullscreen {
   display: flex;
   flex-direction: column;
-  padding: 0.75rem;
+  padding: 0;
   background: var(--bg-gradient-start);
 }
 
@@ -2431,6 +2434,8 @@ footer a {
   flex: 1 1 auto;
   margin-top: 0;
   max-height: none;
+  border: none;
+  border-radius: 0;
 }
 
 .duckrace-stage:fullscreen #duckrace-status {
