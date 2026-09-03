@@ -101,7 +101,10 @@ sitemap: false
         </p>
       </div>
     </div>
-    <video id="admin-checkin-video" class="checkin-video" playsinline muted></video>
+    <div class="duckrace-actions">
+      <button class="btn btn-primary" type="button" id="admin-checkin-toggle">Ativar câmera</button>
+    </div>
+    <video id="admin-checkin-video" class="checkin-video" playsinline muted hidden></video>
     <div id="admin-checkin-result" class="checkin-result" role="status" aria-live="polite"></div>
   </section>
 
@@ -118,21 +121,21 @@ sitemap: false
       <select id="duckrace-meetup-select" class="registration-input"></select>
     </div>
 
-    <p class="meetup-subtitle" id="duckrace-status" role="status" aria-live="polite"></p>
+    <div class="duckrace-stage" id="duckrace-stage">
+      <p class="meetup-subtitle" id="duckrace-status" role="status" aria-live="polite"></p>
 
-    <div class="duckrace-pond" id="duckrace-pond" hidden>
-      <div class="duckrace-lanes" id="duckrace-lanes"></div>
-      <div class="duckrace-finish" aria-hidden="true">
-        <span class="duckrace-finish-label">Chegada</span>
+      <div class="duckrace-pond" id="duckrace-pond" hidden>
+        <div class="duckrace-lanes" id="duckrace-lanes"></div>
       </div>
-    </div>
 
-    <div class="duckrace-actions">
-      <button class="btn btn-primary" type="button" id="duckrace-start-button" disabled>Iniciar corrida</button>
-      <button class="btn btn-ghost" type="button" id="duckrace-mute-button" aria-pressed="false">🔊 Som ligado</button>
-    </div>
+      <div class="duckrace-actions">
+        <button class="btn btn-primary" type="button" id="duckrace-start-button" disabled>Iniciar corrida</button>
+        <button class="btn btn-ghost" type="button" id="duckrace-mute-button" aria-pressed="false">🔊 Som ligado</button>
+        <button class="btn btn-ghost" type="button" id="duckrace-fullscreen-button" aria-pressed="false">⛶ Tela cheia</button>
+      </div>
 
-    <div class="duckrace-winner checkin-success" id="duckrace-winner" hidden role="status" aria-live="polite"></div>
+      <div class="duckrace-winner checkin-success" id="duckrace-winner" hidden role="status" aria-live="polite"></div>
+    </div>
 
     <div class="duckrace-winners" id="duckrace-winners-section" hidden>
       <h3>Já ganharam</h3>

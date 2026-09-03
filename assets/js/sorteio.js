@@ -8,6 +8,8 @@
   const lanesEl = document.getElementById("duckrace-lanes");
   const startButton = document.getElementById("duckrace-start-button");
   const muteButton = document.getElementById("duckrace-mute-button");
+  const fullscreenButton = document.getElementById("duckrace-fullscreen-button");
+  const stageEl = document.getElementById("duckrace-stage");
   const winnerBox = document.getElementById("duckrace-winner");
   const winnersSection = document.getElementById("duckrace-winners-section");
   const winnersList = document.getElementById("duckrace-winners-list");
@@ -19,7 +21,7 @@
   const resetConfirmButton = document.getElementById("duckrace-reset-confirm-button");
 
   const requiredNodes = [
-    meetupSelect, statusEl, pondEl, lanesEl, startButton, muteButton,
+    meetupSelect, statusEl, pondEl, lanesEl, startButton, muteButton, fullscreenButton, stageEl,
     winnerBox, winnersSection, winnersList, resetButton,
     resetModal, resetForm, resetInput, resetConfirmButton
   ];
@@ -61,6 +63,7 @@
   let currentWinnersCount = 0;
   let laneElements = new Map();
   let racing = false;
+  let liveEntries = null;
 
   function hashSeed(value) {
     let hash = 5381;
@@ -167,6 +170,51 @@
     return "compact";
   }
 
+  const MIN_READABLE_LANE = 18;
+  const MAX_COLUMNS = 4;
+
+  function availableHeight() {
+    if (isFullscreen()) {
+      const chrome = Array.from(stageEl.children)
+        .filter((child) => child !== pondEl && !child.hidden)
+        .reduce((total, child) => total + child.offsetHeight, 0);
+      return Math.max(240, stageEl.clientHeight - chrome - 24);
+    }
+    return Math.max(240, Math.round(window.innerHeight * 0.7));
+  }
+
+  function columnsFor(count) {
+    if (count <= 0) return 1;
+    const perColumn = Math.max(1, Math.floor(availableHeight() / MIN_READABLE_LANE));
+    return Math.max(1, Math.min(MAX_COLUMNS, Math.ceil(count / perColumn)));
+  }
+
+  function buildRunner(duck) {
+    const runner = document.createElement("div");
+    runner.className = "duckrace-runner";
+
+    const nameTag = document.createElement("span");
+    nameTag.className = "duckrace-name";
+
+    const nameText = document.createElement("span");
+    nameText.className = "duckrace-name-text";
+    nameText.textContent = duck.name;
+
+    const nameId = document.createElement("span");
+    nameId.className = "duckrace-name-id";
+    nameId.textContent = ` #${duck.id}`;
+
+    nameTag.appendChild(nameText);
+    nameTag.appendChild(nameId);
+
+    const holder = document.createElement("div");
+    holder.innerHTML = buildDuckSvg(duckSkinFor(duck.id));
+
+    runner.appendChild(nameTag);
+    runner.appendChild(holder.firstElementChild);
+    return runner;
+  }
+
   function renderPond(ducks) {
     laneElements = new Map();
     lanesEl.innerHTML = "";
@@ -177,39 +225,43 @@
     }
 
     pondEl.hidden = false;
-    lanesEl.dataset.density = densityFor(ducks.length);
 
-    ducks.forEach((duck) => {
-      const lane = document.createElement("div");
-      lane.className = "duckrace-lane";
+    const columns = columnsFor(ducks.length);
+    const perColumn = Math.ceil(ducks.length / columns);
+    lanesEl.style.setProperty("--duckrace-columns", String(columns));
+    lanesEl.dataset.density = densityFor(perColumn);
 
-      const runner = document.createElement("div");
-      runner.className = "duckrace-runner";
+    for (let c = 0; c < columns; c += 1) {
+      const column = document.createElement("div");
+      column.className = "duckrace-column";
 
-      const nameTag = document.createElement("span");
-      nameTag.className = "duckrace-name";
+      const group = document.createElement("div");
+      group.className = "duckrace-lane-group";
 
-      const nameText = document.createElement("span");
-      nameText.className = "duckrace-name-text";
-      nameText.textContent = duck.name;
+      for (const duck of ducks.slice(c * perColumn, (c + 1) * perColumn)) {
+        const lane = document.createElement("div");
+        lane.className = "duckrace-lane";
 
-      const nameId = document.createElement("span");
-      nameId.className = "duckrace-name-id";
-      nameId.textContent = ` #${duck.id}`;
+        const runner = buildRunner(duck);
+        lane.appendChild(runner);
+        group.appendChild(lane);
+        laneElements.set(duck.id, runner);
+      }
 
-      nameTag.appendChild(nameText);
-      nameTag.appendChild(nameId);
+      const finish = document.createElement("div");
+      finish.className = "duckrace-finish";
+      finish.setAttribute("aria-hidden", "true");
+      const label = document.createElement("span");
+      label.className = "duckrace-finish-label";
+      label.textContent = "Chegada";
+      finish.appendChild(label);
 
-      const duckIconHolder = document.createElement("div");
-      duckIconHolder.innerHTML = buildDuckSvg(duckSkinFor(duck.id));
+      column.appendChild(group);
+      column.appendChild(finish);
+      lanesEl.appendChild(column);
+    }
 
-      runner.appendChild(nameTag);
-      runner.appendChild(duckIconHolder.firstElementChild);
-      lane.appendChild(runner);
-      lanesEl.appendChild(lane);
-
-      laneElements.set(duck.id, runner);
-    });
+    fitStage();
   }
 
   function formatWonAt(value) {
@@ -453,6 +505,77 @@
 
   const audio = createAudioEngine();
 
+  const FIT_MIN_LANE = 12;
+  const FIT_MAX_LANE = 46;
+
+  function fitStage() {
+    if (currentDucks.length === 0) {
+      for (const prop of ["--duckrace-lane-h", "--duckrace-name-size", "--duckrace-duck-w", "--duckrace-name-max-w"]) {
+        lanesEl.style.removeProperty(prop);
+      }
+      return;
+    }
+
+    const columns = Number(lanesEl.style.getPropertyValue("--duckrace-columns")) || 1;
+    const perColumn = Math.ceil(currentDucks.length / columns);
+    const lane = Math.max(FIT_MIN_LANE, Math.min(FIT_MAX_LANE, Math.floor(availableHeight() / perColumn)));
+
+    lanesEl.style.setProperty("--duckrace-lane-h", `${lane}px`);
+    lanesEl.style.setProperty("--duckrace-duck-w", `${Math.max(14, Math.round(lane * 0.9))}px`);
+    lanesEl.style.setProperty("--duckrace-name-size", `${Math.max(9, Math.round(lane * 0.4))}px`);
+    lanesEl.style.setProperty("--duckrace-name-max-w", `${Math.max(64, Math.round(lane * 6))}px`);
+  }
+
+  function measureTrack(entry) {
+    const lane = entry.el.closest(".duckrace-lane");
+    if (!lane) return entry.trackWidth;
+    return Math.max(0, lane.clientWidth - entry.el.offsetWidth - 8);
+  }
+
+  function remeasureTrack() {
+    if (!liveEntries) return;
+    for (const entry of liveEntries) {
+      const next = measureTrack(entry);
+      if (entry.frozenX !== null && entry.trackWidth > 0) {
+        entry.frozenX = (entry.frozenX / entry.trackWidth) * next;
+      }
+      entry.trackWidth = next;
+    }
+  }
+
+  function isFullscreen() {
+    return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  function syncFullscreenButton() {
+    const active = isFullscreen();
+    fullscreenButton.textContent = active ? "⛶ Sair da tela cheia" : "⛶ Tela cheia";
+    fullscreenButton.setAttribute("aria-pressed", active ? "true" : "false");
+
+    const overlay = document.querySelector(".flash-message");
+    if (overlay) {
+      if (active) stageEl.appendChild(overlay);
+      else document.body.appendChild(overlay);
+    }
+
+    fitStage();
+    remeasureTrack();
+  }
+
+  async function toggleFullscreen() {
+    try {
+      if (isFullscreen()) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        return;
+      }
+      if (stageEl.requestFullscreen) await stageEl.requestFullscreen();
+      else if (stageEl.webkitRequestFullscreen) stageEl.webkitRequestFullscreen();
+    } catch {
+      feedback.show("Não foi possível abrir a tela cheia neste navegador.", "error");
+    }
+  }
+
   function raceProgress(entry, elapsed) {
     const span = Math.max(1, entry.finishTime - entry.startDelay);
     const u = Math.min(1, Math.max(0, (elapsed - entry.startDelay) / span));
@@ -502,6 +625,7 @@
         return;
       }
 
+      liveEntries = entries;
       const winnerEntry = entries.find((entry) => entry.isWinner) || entries[0];
       const start = performance.now();
       let nextQuackAt = QUACK_MIN_GAP_MS + Math.random() * QUACK_GAP_SPREAD_MS;
@@ -539,6 +663,7 @@
         });
 
         if (winnerCrossedAt !== null && elapsed - winnerCrossedAt >= VICTORY_RUN_MS) {
+          liveEntries = null;
           resolve();
           return;
         }
@@ -596,7 +721,13 @@
     const label = `🏆 Vencedor(a): ${data.winner.name} #${data.winner.id}`;
     winnerBox.textContent = label;
     winnerBox.hidden = false;
-    if (window.HIBFlash) window.HIBFlash.show(label, "success", WINNER_FLASH_MS);
+    if (window.HIBFlash) {
+      window.HIBFlash.show(label, "success", WINNER_FLASH_MS);
+      if (isFullscreen()) {
+        const overlay = document.querySelector(".flash-message");
+        if (overlay) stageEl.appendChild(overlay);
+      }
+    }
 
     await loadDuckRaceState(currentSlug);
     racing = false;
@@ -686,6 +817,13 @@
   });
 
   startButton.addEventListener("click", startRace);
+  fullscreenButton.addEventListener("click", toggleFullscreen);
+  document.addEventListener("fullscreenchange", syncFullscreenButton);
+  document.addEventListener("webkitfullscreenchange", syncFullscreenButton);
+  window.addEventListener("resize", function () {
+    fitStage();
+    remeasureTrack();
+  });
 
   muteButton.addEventListener("click", function () {
     const nextMuted = !audio.isMuted();

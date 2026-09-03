@@ -48,6 +48,7 @@
   const adminStatus = document.getElementById("admin-checkin-status");
   const adminVideo = document.getElementById("admin-checkin-video");
   const adminResult = document.getElementById("admin-checkin-result");
+  const adminToggle = document.getElementById("admin-checkin-toggle");
 
   const requiredNodes = [
     loadingSection, loadingStatus, retryButton,
@@ -58,7 +59,7 @@
     checkinModal, checkinQrContainer,
     cancelModal, cancelForm, cancelMessage, cancelInput, cancelSubmit, cancelWordLabel,
     feedbackModal, feedbackTitle, feedbackMessage,
-    adminSection, adminStatus, adminVideo, adminResult
+    adminSection, adminStatus, adminVideo, adminResult, adminToggle
   ];
   if (requiredNodes.some((node) => !node)) return;
 
@@ -440,6 +441,26 @@
   let adminLastCode = "";
   let adminLastCodeAt = 0;
   let adminBusy = false;
+  let scannerRequested = false;
+
+  function releaseCamera() {
+    adminScanning = false;
+    adminBusy = false;
+    if (adminScanIntervalId !== null) {
+      window.clearInterval(adminScanIntervalId);
+      adminScanIntervalId = null;
+    }
+    if (adminStream) {
+      adminStream.getTracks().forEach((track) => track.stop());
+      adminStream = null;
+    }
+    adminVideo.srcObject = null;
+    adminVideo.hidden = true;
+    adminToggle.textContent = "Ativar câmera";
+    adminToggle.setAttribute("aria-pressed", "false");
+    adminStatus.textContent = "Ative a câmera para ler o QR code das pessoas.";
+    if (window.HIBFlash) window.HIBFlash.hide();
+  }
 
   function stopAdminScanning() {
     adminScanning = false;
@@ -453,6 +474,10 @@
       adminStream = null;
     }
     adminVideo.srcObject = null;
+    adminVideo.hidden = true;
+    adminToggle.textContent = "Ativar câmera";
+    adminToggle.setAttribute("aria-pressed", "false");
+    adminStatus.textContent = "Ative a câmera para ler o QR code das pessoas.";
     adminSection.hidden = true;
     stopDuckRace();
     if (window.HIBFlash) window.HIBFlash.hide();
@@ -543,6 +568,9 @@
 
   async function startAdminScanning() {
     adminSection.hidden = false;
+    adminVideo.hidden = false;
+    adminToggle.textContent = "Desligar câmera";
+    adminToggle.setAttribute("aria-pressed", "true");
     adminStatus.textContent = "Aponte a câmera para o QR code da pessoa.";
     showAdminResult("", "");
 
@@ -586,7 +614,7 @@
       return;
     }
 
-    startAdminScanning();
+    adminSection.hidden = false;
     startDuckRace();
   }
 
@@ -611,16 +639,28 @@
   }
 
   function stopAdminTools() {
+    scannerRequested = false;
     stopAdminScanning();
     stopDuckRace();
   }
 
-  document.addEventListener("visibilitychange", function () {
-    if (document.hidden) {
-      if (adminScanning) stopAdminScanning();
+  adminToggle.addEventListener("click", function () {
+    if (adminScanning) {
+      scannerRequested = false;
+      releaseCamera();
       return;
     }
-    if (!listSection.hidden && getSessionToken()) checkAdminAccess();
+    scannerRequested = true;
+    startAdminScanning();
+  });
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      if (adminScanning) releaseCamera();
+      return;
+    }
+    if (listSection.hidden || !getSessionToken()) return;
+    if (scannerRequested && !adminScanning) startAdminScanning();
   });
 
   const CHECKIN_POLL_INTERVAL_MS = 3000;

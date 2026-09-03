@@ -213,15 +213,45 @@ describe("duck race rendering", () => {
     expect(secondFill).toBe(firstFill);
   });
 
-  it("switches to the compact density tier for a large field", async () => {
+  it("splits a large field into columns so every duck stays on screen", async () => {
     mounted = mountPage({
       ducks: Array.from({ length: 60 }, (_, i) => ({ id: i + 1, name: `Pessoa ${i}` }))
     });
     await sleep(300);
 
+    const { window } = mounted;
+    const lanes = window.document.getElementById("duckrace-lanes");
+    const columns = window.document.querySelectorAll(".duckrace-column");
+
+    expect(window.document.querySelectorAll(".duckrace-lane").length).toBe(60);
+    expect(columns.length).toBeGreaterThanOrEqual(1);
+    expect(Number(lanes.style.getPropertyValue("--duckrace-columns"))).toBe(columns.length);
+  });
+
+  it("gives every column its own finish line", async () => {
+    mounted = mountPage({
+      ducks: Array.from({ length: 100 }, (_, i) => ({ id: i + 1, name: `Pessoa ${i}` }))
+    });
+    await sleep(300);
+
+    const { window } = mounted;
+    const columns = window.document.querySelectorAll(".duckrace-column");
+    const finishes = window.document.querySelectorAll(".duckrace-finish");
+
+    expect(window.document.querySelectorAll(".duckrace-lane").length).toBe(100);
+    expect(finishes.length).toBe(columns.length);
+  });
+
+  it("keeps lanes readable instead of collapsing them for a huge field", async () => {
+    mounted = mountPage({
+      ducks: Array.from({ length: 100 }, (_, i) => ({ id: i + 1, name: `Pessoa ${i}` }))
+    });
+    await sleep(300);
+
     const lanes = mounted.window.document.getElementById("duckrace-lanes");
-    expect(lanes.dataset.density).toBe("compact");
-    expect(mounted.window.document.querySelectorAll(".duckrace-lane").length).toBe(60);
+    const lane = parseInt(lanes.style.getPropertyValue("--duckrace-lane-h"), 10);
+
+    expect(lane).toBeGreaterThanOrEqual(12);
   });
 
   it("disables the start button when nobody checked in", async () => {

@@ -147,13 +147,41 @@ describe("check-in tool inside the account page", () => {
     expect(mounted.window.document.querySelectorAll(".subscription-card").length).toBe(1);
   });
 
-  it("opens the scanner and asks for the rear camera once the backend confirms admin", async () => {
+  it("reveals the tool for an admin but leaves the camera off until asked", async () => {
     mounted = mountAccount({ isAdmin: true });
     await sleep(300);
 
     expect(q(mounted.window, "#admin-checkin-section").hidden).toBe(false);
+    expect(mounted.cameraCalls).toEqual([]);
+    expect(q(mounted.window, "#admin-checkin-video").hidden).toBe(true);
+    expect(q(mounted.window, "#admin-checkin-toggle").textContent).toContain("Ativar");
+  });
+
+  it("asks for the rear camera only after the admin presses the button", async () => {
+    mounted = mountAccount({ isAdmin: true });
+    await sleep(300);
+
+    q(mounted.window, "#admin-checkin-toggle").click();
+    await sleep(200);
+
     expect(mounted.cameraCalls.length).toBe(1);
     expect(mounted.cameraCalls[0]).toEqual({ video: { facingMode: "environment" } });
+    expect(q(mounted.window, "#admin-checkin-toggle").textContent).toContain("Desligar");
+  });
+
+  it("lets the admin turn the camera back off", async () => {
+    mounted = mountAccount({ isAdmin: true });
+    await sleep(300);
+
+    const toggle = q(mounted.window, "#admin-checkin-toggle");
+    toggle.click();
+    await sleep(200);
+    toggle.click();
+    await sleep(100);
+
+    expect(mounted.stoppedTracks.length).toBeGreaterThan(0);
+    expect(q(mounted.window, "#admin-checkin-video").srcObject).toBe(null);
+    expect(toggle.textContent).toContain("Ativar");
   });
 
   it("asks the backend before touching the camera, never the other way around", async () => {
@@ -162,12 +190,18 @@ describe("check-in tool inside the account page", () => {
 
     const adminStatusIndex = mounted.calls.findIndex((call) => call.includes("/api/me/admin-status"));
     expect(adminStatusIndex).toBeGreaterThanOrEqual(0);
+    expect(mounted.cameraCalls).toEqual([]);
+
+    q(mounted.window, "#admin-checkin-toggle").click();
+    await sleep(200);
     expect(mounted.cameraCalls.length).toBe(1);
   });
 
   it("releases the camera when the person logs out", async () => {
     mounted = mountAccount({ isAdmin: true });
     await sleep(300);
+    q(mounted.window, "#admin-checkin-toggle").click();
+    await sleep(200);
     expect(mounted.stoppedTracks.length).toBe(0);
 
     q(mounted.window, "#logout-button").click();
@@ -181,6 +215,8 @@ describe("check-in tool inside the account page", () => {
   it("explains itself instead of breaking when camera permission is denied", async () => {
     mounted = mountAccount({ isAdmin: true, cameraFails: true });
     await sleep(300);
+    q(mounted.window, "#admin-checkin-toggle").click();
+    await sleep(200);
 
     expect(q(mounted.window, "#admin-checkin-status").textContent).toContain("câmera");
     expect(mounted.errors).toEqual([]);
@@ -189,6 +225,8 @@ describe("check-in tool inside the account page", () => {
   it("hides the scanner again if the session expires", async () => {
     mounted = mountAccount({ isAdmin: true });
     await sleep(300);
+    q(mounted.window, "#admin-checkin-toggle").click();
+    await sleep(200);
     expect(q(mounted.window, "#admin-checkin-section").hidden).toBe(false);
 
     const { window } = mounted;
