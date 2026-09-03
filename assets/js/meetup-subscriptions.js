@@ -299,7 +299,7 @@
 
     const certificate = registration.certificate || {};
 
-    if (registration.canCancel) {
+    if (!registration.canCancel) {
       const checkinButton = document.createElement("button");
       checkinButton.type = "button";
       checkinButton.className = "btn btn-ghost";
