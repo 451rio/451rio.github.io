@@ -2079,7 +2079,7 @@ async function handleRegister(request, env, slug, corsOrigin) {
     const message = String(err?.message || err || "");
 
     if (message.includes("UNIQUE constraint failed")) {
-      let isFull = false;
+      let isFull;
       try {
         const current = await getMeetupBySlug(env.DB, slug);
         isFull = current.registrations_count >= current.capacity || current.is_open !== 1;
@@ -2258,7 +2258,7 @@ async function handleSponsorRegister(request, env, corsOrigin) {
     message
   });
 
-  let emailSent = false;
+  let emailSent;
   try {
     const recipient =
       env.SPONSOR_NOTIFY_EMAIL || env.RESEND_REPLY_TO || "contato@hackinbrasil.com.br";
@@ -2423,7 +2423,7 @@ async function handleTalkSubmit(request, env, corsOrigin) {
     termsAck
   });
 
-  let emailSent = false;
+  let emailSent;
   try {
     const recipient =
       env.TALK_NOTIFY_EMAIL || env.RESEND_REPLY_TO || "contato@hackinbrasil.com.br";

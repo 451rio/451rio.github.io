@@ -157,7 +157,7 @@ export function stubEmailSending() {
   const original = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input.url;
-    let isResendHost = false;
+    let isResendHost;
     try {
       const { hostname } = new URL(url);
       isResendHost = hostname === "resend.com" || hostname.endsWith(".resend.com");

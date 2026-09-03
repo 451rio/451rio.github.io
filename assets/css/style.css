@@ -1448,7 +1448,7 @@ footer a {
   flex: 1 1 12rem;
   min-width: 0;
   margin: 0;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .profile-actions {
@@ -1492,7 +1492,7 @@ footer a {
 .ranking-nickname {
   font-weight: 600;
   min-width: 0;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .ranking-xp {
