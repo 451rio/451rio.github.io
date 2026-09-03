@@ -39,8 +39,8 @@ describe("responsive overrides actually win the cascade", () => {
     expect(pond).toMatch(/--duckrace-finish-w:\s*\d+px/);
     expect(pond).toMatch(/--duckrace-runout-w:\s*\d+px/);
 
-    expect(CSS).toContain("margin-right: calc(var(--duckrace-finish-w, 20px) + var(--duckrace-runout-w, 64px))");
-    expect(CSS).toContain("right: var(--duckrace-runout-w, 64px)");
+    expect(CSS).toMatch(/margin-right: calc\(var\(--duckrace-finish-w, \d+px\) \+ var\(--duckrace-runout-w, \d+px\)\)/);
+    expect(CSS).toMatch(/right: var\(--duckrace-runout-w, \d+px\)/);
   });
 
   it("keeps every duck in the water: the shore is a fixed strip, not a percentage", () => {

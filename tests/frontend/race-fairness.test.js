@@ -88,6 +88,39 @@ describe("the tests exercise the shipped implementation", () => {
   });
 });
 
+describe("victory glide", () => {
+  function readMs(name) {
+    return Number(SORTEIO_SRC.match(new RegExp(`const ${name} = (\\d+);`))[1]);
+  }
+
+  it("gives the winner a visible moment past the line before the banner", () => {
+    expect(readMs("VICTORY_RUN_MS")).toBeGreaterThanOrEqual(3000);
+  });
+
+  it("keeps the winner moving the whole time instead of parking early", () => {
+    const glideSrc = SORTEIO_SRC.match(/const glide = ([^;]+);/);
+    expect(glideSrc, "trecho do deslize nao encontrado").not.toBeNull();
+
+    const glide = new Function("victory", `return ${glideSrc[1]};`);
+    const samples = [0, 0.25, 0.5, 0.75, 1].map(glide);
+
+    for (let i = 1; i < samples.length; i += 1) {
+      const step = samples[i] - samples[i - 1];
+      expect(step, "o pato nao pode parar antes do fim da volta de honra").toBeGreaterThan(0.1);
+    }
+    expect(samples[0]).toBe(0);
+    expect(samples[samples.length - 1]).toBeCloseTo(1, 5);
+  });
+
+  it("has water after the line for the whole glide", () => {
+    const css = fs.readFileSync(path.join(ROOT, "assets", "css", "style.css"), "utf8");
+    const runout = Number(css.match(/--duckrace-runout-w:\s*(\d+)px/)[1]);
+    const distance = Number(SORTEIO_SRC.match(/const VICTORY_RUN_PX = (\d+);/)[1]);
+
+    expect(runout).toBeGreaterThanOrEqual(distance);
+  });
+});
+
 describe("race timing bands", () => {
   it("keeps the winner band strictly faster than the field", () => {
     expect(WINNER_MAX_MS).toBeLessThan(OTHER_MIN_MS);

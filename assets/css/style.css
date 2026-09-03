@@ -2247,7 +2247,7 @@ footer a {
 
 .duckrace-pond {
   --duckrace-finish-w: 20px;
-  --duckrace-runout-w: 64px;
+  --duckrace-runout-w: 130px;
   --duckrace-shore-h: 30px;
   position: relative;
   margin-top: 1rem;
@@ -2279,7 +2279,7 @@ footer a {
 .duckrace-lane-group {
   position: relative;
   z-index: 2;
-  margin-right: calc(var(--duckrace-finish-w, 20px) + var(--duckrace-runout-w, 64px));
+  margin-right: calc(var(--duckrace-finish-w, 20px) + var(--duckrace-runout-w, 130px));
 }
 
 
@@ -2339,9 +2339,9 @@ footer a {
 
 .duckrace-finish {
   position: absolute;
-  top: 0;
-  right: var(--duckrace-runout-w, 64px);
-  bottom: 0;
+  top: calc(-1 * (var(--duckrace-shore-h, 30px) + 14px));
+  right: var(--duckrace-runout-w, 130px);
+  bottom: -14px;
   z-index: 1;
   width: var(--duckrace-finish-w, 20px);
   background: repeating-conic-gradient(#0b1a20 0% 25%, #f5f7f8 0% 50%) 0 0 / 15px 15px;
@@ -2531,7 +2531,7 @@ footer a {
 
   .duckrace-pond {
     --duckrace-finish-w: 14px;
-    --duckrace-runout-w: 34px;
+    --duckrace-runout-w: 56px;
     touch-action: pan-y;
     user-select: none;
   }

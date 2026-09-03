@@ -54,8 +54,8 @@
   const START_STAGGER_MS = 350;
   const QUACK_MIN_GAP_MS = 450;
   const QUACK_GAP_SPREAD_MS = 900;
-  const VICTORY_RUN_MS = 1600;
-  const VICTORY_RUN_PX = 64;
+  const VICTORY_RUN_MS = 3800;
+  const VICTORY_RUN_PX = 120;
 
   let meetupsCache = [];
   let currentSlug = "";
@@ -641,7 +641,8 @@
             x = entry.frozenX;
           } else if (entry.isWinner && winnerCrossedAt !== null) {
             const victory = Math.min(1, (elapsed - winnerCrossedAt) / VICTORY_RUN_MS);
-            x = entry.trackWidth + (1 - Math.pow(1 - victory, 3)) * VICTORY_RUN_PX;
+            const glide = 0.25 * (1 - Math.pow(1 - victory, 2)) + 0.75 * victory;
+            x = entry.trackWidth + glide * VICTORY_RUN_PX;
           } else {
             x = raceProgress(entry, elapsed) * entry.trackWidth;
           }

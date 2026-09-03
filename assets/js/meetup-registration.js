@@ -135,10 +135,22 @@
     });
   }
 
+  let registrationsClosed = false;
+
   function setClosedState(message) {
     status.textContent = message;
     submit.disabled = true;
     submit.textContent = "Aguardando próximo lote";
+  }
+
+  function hideRegistrationArea(message) {
+    registrationsClosed = true;
+    formFields.hidden = true;
+    submit.disabled = true;
+    status.textContent = message;
+
+    const heading = form.closest(".meetup-card")?.querySelector("h2");
+    if (heading) heading.textContent = "Inscrições encerradas";
   }
 
   const BATCH_RELEASE_MESSAGE =
@@ -153,6 +165,13 @@
         status.textContent = data.error || "Não foi possível consultar as vagas.";
         submit.disabled = true;
         feedback.show("Falha ao carregar disponibilidade de vagas.", "error");
+        return;
+      }
+
+      if (data.isOpen === false) {
+        hideRegistrationArea(
+          "As inscrições para este meetup estão encerradas. Acompanhe nossas redes para saber da próxima edição."
+        );
         return;
       }
 
@@ -259,6 +278,7 @@
   });
 
   captcha.render().then(function () {
+    if (registrationsClosed) return;
     if (captcha.ready()) {
       formFields.hidden = false;
     } else {
