@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { createHash } from "node:crypto";
 import worker from "../../workers/meetup-api/src/index.js";
 import {
   createEnv,
@@ -10,10 +11,6 @@ import {
 } from "../helpers/worker-env.js";
 
 const SLUG = "meetup-teste";
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function leadingZeroBits(bytes) {
   let count = 0;
@@ -36,9 +33,8 @@ async function solveCaptcha(env, ctx) {
   const encoder = new TextEncoder();
 
   for (let nonce = 0; ; nonce += 1) {
-    const digest = await crypto.subtle.digest("SHA-256", encoder.encode(`${challenge.seed}:${nonce}`));
-    if (leadingZeroBits(new Uint8Array(digest)) >= challenge.difficulty) {
-      await sleep(1100);
+    const digest = createHash("sha256").update(encoder.encode(`${challenge.seed}:${nonce}`)).digest();
+    if (leadingZeroBits(digest) >= challenge.difficulty) {
       return { id: challenge.id, nonce };
     }
   }

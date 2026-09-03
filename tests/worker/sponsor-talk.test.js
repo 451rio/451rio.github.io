@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { createHash } from "node:crypto";
 import worker from "../../workers/meetup-api/src/index.js";
 import { createEnv, createCtx, jsonRequest, getRequest, stubEmailSending } from "../helpers/worker-env.js";
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function leadingZeroBits(bytes) {
   let count = 0;
@@ -27,9 +24,8 @@ async function solveCaptcha(env, ctx) {
   const encoder = new TextEncoder();
 
   for (let nonce = 0; ; nonce += 1) {
-    const digest = await crypto.subtle.digest("SHA-256", encoder.encode(`${challenge.seed}:${nonce}`));
-    if (leadingZeroBits(new Uint8Array(digest)) >= challenge.difficulty) {
-      await sleep(1100);
+    const digest = createHash("sha256").update(encoder.encode(`${challenge.seed}:${nonce}`)).digest();
+    if (leadingZeroBits(digest) >= challenge.difficulty) {
       return { id: challenge.id, nonce };
     }
   }
@@ -247,6 +243,73 @@ describe("talk proposals", () => {
   it("refuses a proposal with no captcha", async () => {
     const response = await worker.fetch(jsonRequest("https://api.test/api/talks", TALK), env, ctx);
     expect(response.status).toBe(400);
+  });
+});
+
+describe("public forms cannot starve participant email", () => {
+  let env;
+  let ctx;
+  let mail;
+
+  beforeEach(() => {
+    env = createEnv();
+    ctx = createCtx();
+    mail = stubEmailSending();
+  });
+
+  afterEach(() => {
+    mail.restore();
+  });
+
+  it("caps sponsor notifications on their own budget", { timeout: 40000 }, async () => {
+    env.NOTIFY_EMAIL_DAILY_CAP = "2";
+
+    for (let i = 0; i < 3; i += 1) {
+      await postSponsor(env, ctx, { email: `empresa${i}@example.com` });
+      await ctx.settle();
+    }
+
+    expect(mail.sent.length).toBe(2);
+  });
+
+  it("keeps the whole participant budget intact even after a flood of public submissions", { timeout: 40000 }, async () => {
+    env.NOTIFY_EMAIL_DAILY_CAP = "1";
+    env.DAILY_EMAIL_CAP = "10";
+
+    for (let i = 0; i < 3; i += 1) {
+      await postSponsor(env, ctx, { email: `flood${i}@example.com` });
+      await ctx.settle();
+    }
+
+    const spent = Number(
+      env.DB.raw.prepare("SELECT COUNT(*) AS t FROM email_sends WHERE date(sent_at) = date('now')").get().t
+    );
+
+    expect(spent).toBe(1);
+    expect(10 - spent).toBeGreaterThanOrEqual(9);
+  });
+
+  it("still records every submission even when the notification is suppressed", { timeout: 40000 }, async () => {
+    env.NOTIFY_EMAIL_DAILY_CAP = "1";
+
+    await postSponsor(env, ctx, { email: "a@example.com" });
+    await ctx.settle();
+    await postSponsor(env, ctx, { email: "b@example.com" });
+    await ctx.settle();
+
+    const rows = Number(env.DB.raw.prepare("SELECT COUNT(*) AS t FROM sponsor_requests").get().t);
+    expect(rows).toBe(2);
+  });
+
+  it("gives talks their own budget, separate from sponsors", { timeout: 40000 }, async () => {
+    env.NOTIFY_EMAIL_DAILY_CAP = "1";
+
+    await postSponsor(env, ctx, { email: "empresa@example.com" });
+    await ctx.settle();
+    await postTalk(env, ctx, { email: "palestrante@example.com" });
+    await ctx.settle();
+
+    expect(mail.sent.length).toBe(2);
   });
 });
 

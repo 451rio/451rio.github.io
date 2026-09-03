@@ -1,25 +1,7 @@
 (function () {
-  const page = document.getElementById("duckrace-page");
-  if (!page || !window.HIBForms) return;
+  const section = document.getElementById("duckrace-section");
+  if (!section) return;
 
-  const F = window.HIBForms;
-  const apiBase = (page.dataset.apiBase || "").trim().replace(/\/$/, "");
-
-  const loadingSection = document.getElementById("duckrace-loading-section");
-  const loadingStatus = document.getElementById("duckrace-loading-status");
-
-  const loginSection = document.getElementById("duckrace-login-section");
-  const loginStatus = document.getElementById("duckrace-login-status");
-  const loginForm = document.getElementById("duckrace-login-form");
-  const loginEmail = document.getElementById("duckrace-login-email");
-  const loginSubmit = document.getElementById("duckrace-login-submit");
-  const captchaStatus = document.getElementById("duckrace-captcha-status");
-  const loginFormFields = document.getElementById("duckrace-login-form-fields");
-
-  const deniedSection = document.getElementById("duckrace-denied-section");
-
-  const mainSection = document.getElementById("duckrace-main-section");
-  const logoutButton = document.getElementById("duckrace-logout-button");
   const meetupSelect = document.getElementById("duckrace-meetup-select");
   const statusEl = document.getElementById("duckrace-status");
   const pondEl = document.getElementById("duckrace-pond");
@@ -37,19 +19,17 @@
   const resetConfirmButton = document.getElementById("duckrace-reset-confirm-button");
 
   const requiredNodes = [
-    loadingSection, loadingStatus,
-    loginSection, loginStatus, loginForm, loginEmail, loginSubmit, captchaStatus, loginFormFields,
-    deniedSection,
-    mainSection, logoutButton, meetupSelect, statusEl, pondEl, lanesEl, startButton, muteButton,
+    meetupSelect, statusEl, pondEl, lanesEl, startButton, muteButton,
     winnerBox, winnersSection, winnersList, resetButton,
     resetModal, resetForm, resetInput, resetConfirmButton
   ];
   if (requiredNodes.some((node) => !node)) return;
 
-  const captcha = F.createCaptcha(apiBase, captchaStatus);
-
-  const SESSION_KEY = "hib.subscriptions.session";
-  const SESSION_EXPIRED_MESSAGE = "Sua sessão expirou. Informe o e-mail para receber um novo link de acesso.";
+  let apiFetch = null;
+  let feedback = { show() {} };
+  let onSessionExpired = function () {};
+  let onForbidden = function () {};
+  let started = false;
 
   const DUCK_COLORS = [
     "#f4d74d", "#ff9f43", "#2fc3a2", "#ff6b9d", "#4dd0e1",
@@ -81,61 +61,6 @@
   let currentWinnersCount = 0;
   let laneElements = new Map();
   let racing = false;
-
-  function getSessionToken() {
-    try {
-      return sessionStorage.getItem(SESSION_KEY) || "";
-    } catch {
-      return "";
-    }
-  }
-
-  function setSessionToken(token) {
-    try {
-      if (token) sessionStorage.setItem(SESSION_KEY, token);
-      else sessionStorage.removeItem(SESSION_KEY);
-    } catch {
-    }
-  }
-
-  function showOnly(section) {
-    loadingSection.hidden = section !== loadingSection;
-    loginSection.hidden = section !== loginSection;
-    deniedSection.hidden = section !== deniedSection;
-    mainSection.hidden = section !== mainSection;
-  }
-
-  function showLoading(message) {
-    showOnly(loadingSection);
-    loadingStatus.textContent = message;
-  }
-
-  function showLogin(message) {
-    showOnly(loginSection);
-    if (message) loginStatus.textContent = message;
-    loginFormFields.hidden = true;
-    captcha.render().then(function () {
-      if (captcha.ready()) {
-        loginFormFields.hidden = false;
-      } else {
-        loginStatus.textContent = "Não foi possível carregar o formulário. Recarregue a página.";
-      }
-    });
-  }
-
-  function showDenied() {
-    showOnly(deniedSection);
-  }
-
-  async function apiFetch(path, options) {
-    const config = Object.assign({}, options);
-    config.headers = Object.assign({}, config.headers, {
-      authorization: `Bearer ${getSessionToken()}`
-    });
-    const response = await fetch(`${apiBase}${path}`, config);
-    const data = await response.json().catch(() => ({}));
-    return { response, data };
-  }
 
   function hashSeed(value) {
     let hash = 5381;
@@ -359,11 +284,11 @@
     }
 
     if (response.status === 401) {
-      showLogin(SESSION_EXPIRED_MESSAGE);
+      onSessionExpired();
       return;
     }
     if (response.status === 403) {
-      showDenied();
+      onForbidden();
       return;
     }
     if (!response.ok) {
@@ -409,8 +334,7 @@
     });
   }
 
-  async function initMain() {
-    showOnly(mainSection);
+  async function loadMeetups() {
     winnerBox.hidden = true;
 
     let response, data;
@@ -422,11 +346,11 @@
     }
 
     if (response.status === 401) {
-      showLogin(SESSION_EXPIRED_MESSAGE);
+      onSessionExpired();
       return;
     }
     if (response.status === 403) {
-      showDenied();
+      onForbidden();
       return;
     }
     if (!response.ok || !Array.isArray(data.meetups)) {
@@ -444,29 +368,6 @@
     currentSlug = pickDefaultSlug(meetupsCache);
     meetupSelect.value = currentSlug;
     await loadDuckRaceState(currentSlug);
-  }
-
-  async function checkAdminAndStart() {
-    showLoading("Verificando acesso...");
-
-    let response, data;
-    try {
-      ({ response, data } = await apiFetch("/api/me/admin-status", { method: "GET" }));
-    } catch {
-      showLoading("Erro de conexão. Recarregue a página.");
-      return;
-    }
-
-    if (response.status === 401) {
-      showLogin(SESSION_EXPIRED_MESSAGE);
-      return;
-    }
-    if (!response.ok || !data.isAdmin) {
-      showDenied();
-      return;
-    }
-
-    await initMain();
   }
 
   function createAudioEngine() {
@@ -673,12 +574,12 @@
 
     if (response.status === 401) {
       racing = false;
-      showLogin(SESSION_EXPIRED_MESSAGE);
+      onSessionExpired();
       return;
     }
     if (response.status === 403) {
       racing = false;
-      showDenied();
+      onForbidden();
       return;
     }
     if (response.status === 409 || !response.ok || !data.winner) {
@@ -753,7 +654,7 @@
     } catch {
       closeResetModal();
       resetConfirmButton.textContent = "Resetar sorteio";
-      statusEl.textContent = "Erro de conexão. Tente novamente.";
+      feedback.show("Erro de conexão. Tente novamente.", "error");
       return;
     }
 
@@ -761,15 +662,15 @@
     resetConfirmButton.textContent = "Resetar sorteio";
 
     if (response.status === 401) {
-      showLogin(SESSION_EXPIRED_MESSAGE);
+      onSessionExpired();
       return;
     }
     if (response.status === 403) {
-      showDenied();
+      onForbidden();
       return;
     }
     if (!response.ok) {
-      statusEl.textContent = data.error || "Não foi possível resetar o sorteio.";
+      feedback.show(data.error || "Não foi possível resetar o sorteio.", "error");
       return;
     }
 
@@ -777,10 +678,6 @@
     await loadDuckRaceState(currentSlug);
   });
 
-  logoutButton.addEventListener("click", function () {
-    setSessionToken("");
-    showLogin();
-  });
 
   meetupSelect.addEventListener("change", function () {
     if (racing) return;
@@ -797,86 +694,25 @@
     muteButton.setAttribute("aria-pressed", nextMuted ? "true" : "false");
   });
 
-  loginForm.addEventListener("submit", async function (event) {
-    event.preventDefault();
 
-    const email = String(loginEmail.value || "").trim();
-    if (!email) return;
+  window.HIBDuckRace = {
+    start(deps) {
+      apiFetch = deps.apiFetch;
+      if (deps.feedback) feedback = deps.feedback;
+      if (deps.onSessionExpired) onSessionExpired = deps.onSessionExpired;
+      if (deps.onForbidden) onForbidden = deps.onForbidden;
 
-    if (!captcha.ready()) {
-      loginStatus.textContent = "Aguarde a verificação de segurança terminar e tente novamente.";
-      return;
+      section.hidden = false;
+      if (started) return;
+      started = true;
+      loadMeetups();
+    },
+    stop() {
+      section.hidden = true;
+      closeResetModal();
+    },
+    isStarted() {
+      return started;
     }
-
-    loginSubmit.disabled = true;
-    loginSubmit.textContent = "Enviando...";
-
-    try {
-      const response = await fetch(`${apiBase}/api/auth/magic-link`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email,
-          captchaId: captcha.getToken(),
-          captcha: Number(captcha.getAnswer())
-        })
-      });
-      const data = await response.json().catch(() => ({}));
-      loginStatus.textContent = data.message || "Se o e-mail tiver acesso, enviamos um link de acesso.";
-    } catch {
-      loginStatus.textContent = "Erro de conexão. Tente novamente.";
-    }
-
-    captcha.render();
-    loginSubmit.disabled = false;
-    loginSubmit.textContent = "Receber link de acesso";
-  });
-
-  async function exchangeAccessToken(token) {
-    showLoading("Validando seu link de acesso...");
-
-    let response, data;
-    try {
-      response = await fetch(`${apiBase}/api/auth/session`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token })
-      });
-      data = await response.json().catch(() => ({}));
-    } catch {
-      showLogin("Erro de conexão ao validar o link. Tente novamente.");
-      return;
-    }
-
-    if (!response.ok || !data.token) {
-      setSessionToken("");
-      showLogin(data.error || "Link de acesso inválido ou expirado. Solicite um novo.");
-      return;
-    }
-
-    setSessionToken(data.token);
-    await checkAdminAndStart();
-  }
-
-  function takeTokenFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
-    if (!token) return "";
-
-    params.delete("token");
-    const query = params.toString();
-    const cleanUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
-    window.history.replaceState({}, document.title, cleanUrl);
-
-    return F.isOpaqueToken(token) ? token : "";
-  }
-
-  if (!apiBase) {
-    showLogin("Configuração pendente: defina o domínio da API nesta página.");
-  } else {
-    const urlToken = takeTokenFromUrl();
-    if (urlToken) exchangeAccessToken(urlToken);
-    else if (getSessionToken()) checkAdminAndStart();
-    else showLogin();
-  }
+  };
 })();

@@ -748,7 +748,13 @@ function randomIndexBelow(count) {
 
 const POW_DIFFICULTY_BITS = 10;
 const POW_CHALLENGE_TTL_MINUTES = 5;
-const POW_MIN_SOLVE_SECONDS = 1;
+const DEFAULT_POW_MIN_SOLVE_SECONDS = 1;
+
+function powMinSolveSeconds(env) {
+  const configured = Number(env.POW_MIN_SOLVE_SECONDS);
+  if (!Number.isFinite(configured) || configured < 0) return DEFAULT_POW_MIN_SOLVE_SECONDS;
+  return Math.floor(configured);
+}
 
 function powLeadingZeroBits(bytes) {
   let count = 0;
@@ -796,9 +802,9 @@ async function consumeCaptcha(env, id, nonce) {
   try {
     consumed = await env.DB
       .prepare(
-        `UPDATE captcha_challenges SET consumed = 1 WHERE id = ? AND consumed = 0 AND expires_at > CURRENT_TIMESTAMP AND created_at <= datetime('now', '-${POW_MIN_SOLVE_SECONDS} seconds')`
+        `UPDATE captcha_challenges SET consumed = 1 WHERE id = ? AND consumed = 0 AND expires_at > CURRENT_TIMESTAMP AND created_at <= datetime('now', ?)`
       )
-      .bind(id)
+      .bind(id, `-${powMinSolveSeconds(env)} seconds`)
       .run();
   } catch {
     return false;

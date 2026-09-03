@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { JSDOM } from "jsdom";
+import { webcrypto } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,10 +8,11 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, "..", "..");
 
-const PAGE_HTML = fs.readFileSync(path.join(ROOT, "sorteio.html"), "utf8");
+const PAGE_HTML = fs.readFileSync(path.join(ROOT, "minhas-inscricoes.html"), "utf8");
 const FORM_UTILS = fs.readFileSync(path.join(ROOT, "assets", "js", "form-utils.js"), "utf8");
 const MAIN_JS = fs.readFileSync(path.join(ROOT, "assets", "js", "main.js"), "utf8");
 const SORTEIO_JS = fs.readFileSync(path.join(ROOT, "assets", "js", "sorteio.js"), "utf8");
+const SUBSCRIPTIONS_JS = fs.readFileSync(path.join(ROOT, "assets", "js", "meetup-subscriptions.js"), "utf8");
 
 function stripFrontMatter(html) {
   return html.replace(/^---[\s\S]*?---\n/, "").replace(/\{\{[\s\S]*?\}\}/g, "#").replace(/\{%[\s\S]*?%\}/g, "");
@@ -20,14 +22,17 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function mountPage({ isAdmin = true, ducks = [], winners = [] } = {}) {
+function mountPage({ isAdmin = true, ducks = [], winners = [], withSession = true } = {}) {
   const dom = new JSDOM(`<!doctype html><html><body>${stripFrontMatter(PAGE_HTML)}</body></html>`, {
-    url: "https://hackinbrasil.com.br/sorteio/",
+    url: "https://hackinbrasil.com.br/minhas-inscricoes/",
     runScripts: "outside-only",
     pretendToBeVisual: true
   });
 
   const { window } = dom;
+  if (!window.crypto || !window.crypto.subtle) {
+    Object.defineProperty(window, "crypto", { value: webcrypto, configurable: true });
+  }
   const errors = [];
   window.addEventListener("error", (event) => errors.push(event.error || event.message));
 
@@ -46,6 +51,20 @@ function mountPage({ isAdmin = true, ducks = [], winners = [] } = {}) {
       json: async () => body
     });
 
+    if (target.endsWith("/api/me/registrations")) {
+      return reply(200, {
+        email: "admin@example.com",
+        confirmationWord: "CANCELAR",
+        profile: { nickname: null, isPublic: false, xp: 0, meetupsAttended: 0 },
+        registrations: []
+      });
+    }
+    if (target.endsWith("/api/captcha")) {
+      return reply(200, { id: "captcha-1", seed: "seed", difficulty: 0 });
+    }
+    if (target.endsWith("/api/auth/magic-link")) {
+      return reply(200, { ok: true, message: "Link enviado." });
+    }
     if (target.endsWith("/api/me/admin-status")) return reply(200, { isAdmin });
     if (target.endsWith("/api/admin/meetups")) {
       return reply(200, {
@@ -69,10 +88,29 @@ function mountPage({ isAdmin = true, ducks = [], winners = [] } = {}) {
     return reply(404, { error: "not found" });
   };
 
-  window.sessionStorage.setItem("hib.subscriptions.session", "session-token");
+  if (withSession) window.sessionStorage.setItem("hib.subscriptions.session", "session-token");
+  window.navigator.mediaDevices = {
+    async getUserMedia() {
+      return { getTracks: () => [{ stop() {} }] };
+    }
+  };
+  window.HTMLMediaElement.prototype.play = function play() {
+    return Promise.resolve();
+  };
+  window.jsQR = () => null;
+
   window.eval(FORM_UTILS);
+  window.HIBForms.createCaptcha = function () {
+    return {
+      render: async () => {},
+      getToken: () => "captcha-1",
+      getAnswer: () => "0",
+      ready: () => true
+    };
+  };
   window.eval(MAIN_JS);
   window.eval(SORTEIO_JS);
+  window.eval(SUBSCRIPTIONS_JS);
 
   return { dom, window, errors, calls };
 }
@@ -85,13 +123,13 @@ describe("duck race page gating", () => {
     mounted = null;
   });
 
-  it("shows the access denied card for a non-admin session", async () => {
+  it("keeps the raffle completely hidden from a non-admin session", async () => {
     mounted = mountPage({ isAdmin: false });
-    await sleep(200);
+    await sleep(250);
 
     const { window } = mounted;
-    expect(window.document.getElementById("duckrace-denied-section").hidden).toBe(false);
-    expect(window.document.getElementById("duckrace-main-section").hidden).toBe(true);
+    expect(window.document.getElementById("duckrace-section").hidden).toBe(true);
+    expect(window.document.getElementById("admin-checkin-section").hidden).toBe(true);
     expect(mounted.errors).toEqual([]);
   });
 
@@ -110,7 +148,7 @@ describe("duck race page gating", () => {
     await sleep(200);
 
     const { window } = mounted;
-    expect(window.document.getElementById("duckrace-main-section").hidden).toBe(false);
+    expect(window.document.getElementById("duckrace-section").hidden).toBe(false);
     expect(window.document.querySelectorAll(".duckrace-lane").length).toBe(2);
   });
 });
@@ -287,27 +325,50 @@ describe("raffle reset confirmation", () => {
   });
 });
 
-describe("session handling", () => {
-  it("ignores a malformed token in the URL instead of sending it to the API", async () => {
-    const dom = new JSDOM(`<!doctype html><html><body>${stripFrontMatter(PAGE_HTML)}</body></html>`, {
-      url: "https://hackinbrasil.com.br/sorteio/?token=<script>alert(1)</script>",
-      runScripts: "outside-only",
-      pretendToBeVisual: true
-    });
+describe("login feedback follows the site pattern", () => {
+  let mounted;
 
-    const calls = [];
-    dom.window.fetch = async (url) => {
-      calls.push(String(url));
-      return { ok: false, status: 401, json: async () => ({}) };
-    };
+  afterEach(() => {
+    if (mounted) mounted.dom.window.close();
+    mounted = null;
+  });
 
-    dom.window.eval(FORM_UTILS);
-    dom.window.eval(MAIN_JS);
-    dom.window.eval(SORTEIO_JS);
-    await sleep(150);
+  it("shows the magic link result in the shared modal, not as loose text", async () => {
+    mounted = mountPage({ withSession: false });
+    await sleep(300);
 
-    expect(calls.some((call) => call.includes("/api/auth/session"))).toBe(false);
-    expect(dom.window.location.search).not.toContain("token=");
-    dom.window.close();
+    const { window } = mounted;
+    const modal = window.document.getElementById("subscriptionFeedbackModal");
+    expect(modal).not.toBeNull();
+    expect(modal.classList.contains("open")).toBe(false);
+
+    window.document.getElementById("login-email").value = "admin@example.com";
+
+    const form = window.document.getElementById("magic-link-form");
+    form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+    await sleep(200);
+
+    expect(modal.classList.contains("open")).toBe(true);
+    expect(window.document.getElementById("subscription-feedback-message").textContent).toContain("Link enviado.");
+    expect(window.document.getElementById("subscription-feedback-title").textContent).toBe("Tudo certo");
+  });
+
+  it("no longer ships a separate raffle page", () => {
+    expect(fs.existsSync(path.join(ROOT, "sorteio.html"))).toBe(false);
+  });
+
+  it("keeps check-in and raffle on one page, behind one admin check", () => {
+    const account = fs.readFileSync(path.join(ROOT, "minhas-inscricoes.html"), "utf8");
+    expect(account).toContain('id="admin-checkin-section"');
+    expect(account).toContain('id="duckrace-section"');
+
+    expect(account).toMatch(/id="duckrace-section"[^>]*\shidden/);
+    expect(account).toMatch(/id="admin-checkin-section"[^>]*\shidden/);
+
+    const subscriptions = fs.readFileSync(path.join(ROOT, "assets", "js", "meetup-subscriptions.js"), "utf8");
+    const startCalls = subscriptions.match(/HIBDuckRace\.start\(/g) || [];
+    expect(startCalls.length).toBe(1);
+    expect(subscriptions).toContain("/api/me/admin-status");
   });
 });
+

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { createHash } from "node:crypto";
 import worker from "../../workers/meetup-api/src/index.js";
 import {
   createEnv,
@@ -13,10 +14,6 @@ import {
 const ADMIN = "admin@hackinbrasil.com.br";
 const PARTICIPANT = "pessoa@example.com";
 const STRANGER = "ninguem@example.com";
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function leadingZeroBits(bytes) {
   let count = 0;
@@ -41,8 +38,8 @@ async function issueCaptcha(env, ctx) {
 async function solveChallenge(challenge) {
   const encoder = new TextEncoder();
   for (let nonce = 0; ; nonce += 1) {
-    const digest = await crypto.subtle.digest("SHA-256", encoder.encode(`${challenge.seed}:${nonce}`));
-    if (leadingZeroBits(new Uint8Array(digest)) >= challenge.difficulty) {
+    const digest = createHash("sha256").update(encoder.encode(`${challenge.seed}:${nonce}`)).digest();
+    if (leadingZeroBits(digest) >= challenge.difficulty) {
       return { id: challenge.id, nonce };
     }
   }
@@ -51,7 +48,6 @@ async function solveChallenge(challenge) {
 async function solveCaptcha(env, ctx) {
   const challenge = await issueCaptcha(env, ctx);
   const solved = await solveChallenge(challenge);
-  await sleep(1100);
   return solved;
 }
 
@@ -174,6 +170,7 @@ describe("magic link authorization", () => {
   });
 
   it("rejects a captcha solved faster than a human plausibly could", async () => {
+    env.POW_MIN_SOLVE_SECONDS = "1";
     const challenge = await issueCaptcha(env, ctx);
     const solved = await solveChallenge(challenge);
 
@@ -194,7 +191,6 @@ describe("magic link authorization", () => {
   it("rejects a wrong proof of work for a valid challenge", async () => {
     const challenge = await issueCaptcha(env, ctx);
     const solved = await solveChallenge(challenge);
-    await sleep(1100);
 
     const response = await worker.fetch(
       jsonRequest("https://api.test/api/auth/magic-link", {

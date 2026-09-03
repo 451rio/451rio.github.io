@@ -63,6 +63,7 @@ function sendsToday(env) {
 
 function stubResend({ fail = false } = {}) {
   const calls = [];
+  const idempotencyKeys = [];
   const original = globalThis.fetch;
 
   globalThis.fetch = async (input, init) => {
@@ -78,6 +79,7 @@ function stubResend({ fail = false } = {}) {
     }
 
     calls.push(init && init.body ? JSON.parse(init.body) : null);
+    idempotencyKeys.push(init && init.headers ? init.headers["Idempotency-Key"] : undefined);
     if (fail) {
       return new Response(JSON.stringify({ message: "provider is down" }), { status: 500 });
     }
@@ -89,6 +91,7 @@ function stubResend({ fail = false } = {}) {
 
   return {
     calls,
+    idempotencyKeys,
     restore() {
       globalThis.fetch = original;
     }
@@ -286,6 +289,32 @@ describe("jobs interrupted mid-send are not lost", () => {
     expect(job.status).toBe("failed");
     expect(job.last_error).toContain("tentativas esgotadas");
     expect(resend.calls.length).toBe(0);
+  });
+
+  it("sends a stable idempotency key so a requeued job cannot arrive twice", async () => {
+    stuckJob(30);
+
+    await runCron(env);
+
+    expect(resend.idempotencyKeys.length).toBe(1);
+    expect(resend.idempotencyKeys[0]).toMatch(/^job-\d+$/);
+
+    const jobId = jobRows(env)[0].id;
+    expect(resend.idempotencyKeys[0]).toBe(`job-${jobId}`);
+  });
+
+  it("reuses the same idempotency key when a failed send is retried", async () => {
+    resend.restore();
+    resend = stubResend({ fail: true });
+
+    queueJob(env);
+    await runCron(env);
+
+    env.DB.raw.prepare("UPDATE email_jobs SET send_after = datetime('now', '-1 minute')").run();
+    await runCron(env);
+
+    expect(resend.calls.length).toBe(2);
+    expect(new Set(resend.idempotencyKeys).size).toBe(1);
   });
 
   it("does not resurrect a job that already went out", async () => {

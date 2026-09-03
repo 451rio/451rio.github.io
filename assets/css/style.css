@@ -859,6 +859,15 @@ footer a {
   margin-bottom: 1rem;
 }
 
+.meetup-subtitle a {
+  color: var(--accent-soft);
+  text-decoration: underline;
+}
+
+.meetup-subtitle a:hover {
+  color: var(--accent);
+}
+
 .meetup-card h2 {
   font-size: 1.3rem;
   margin-bottom: 0.9rem;

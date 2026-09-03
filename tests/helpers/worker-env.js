@@ -98,6 +98,7 @@ export function createEnv(overrides = {}) {
     DOC_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 7).toString("base64"),
     RESEND_API_KEY: "test-key",
     RESEND_FROM_EMAIL: "no-reply@hackinbrasil.com.br",
+    POW_MIN_SOLVE_SECONDS: "0",
     ...overrides
   };
 }

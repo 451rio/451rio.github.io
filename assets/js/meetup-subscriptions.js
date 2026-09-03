@@ -131,7 +131,10 @@
     loginSection.hidden = section !== loginSection;
     listSection.hidden = section !== listSection;
     profileSection.hidden = section !== listSection;
-    if (section !== listSection) adminSection.hidden = true;
+    if (section !== listSection) {
+      adminSection.hidden = true;
+      stopDuckRace();
+    }
   }
 
   function formatXp(xp) {
@@ -451,6 +454,7 @@
     }
     adminVideo.srcObject = null;
     adminSection.hidden = true;
+    stopDuckRace();
     if (window.HIBFlash) window.HIBFlash.hide();
   }
 
@@ -565,6 +569,7 @@
   async function checkAdminAccess() {
     if (adminScanning) {
       adminSection.hidden = false;
+      startDuckRace();
       return;
     }
 
@@ -582,6 +587,32 @@
     }
 
     startAdminScanning();
+    startDuckRace();
+  }
+
+  function startDuckRace() {
+    if (!window.HIBDuckRace) return;
+    window.HIBDuckRace.start({
+      apiFetch,
+      feedback,
+      onSessionExpired() {
+        stopAdminTools();
+        setSessionToken("");
+        showLogin(SESSION_EXPIRED_MESSAGE);
+      },
+      onForbidden() {
+        stopAdminTools();
+      }
+    });
+  }
+
+  function stopDuckRace() {
+    if (window.HIBDuckRace) window.HIBDuckRace.stop();
+  }
+
+  function stopAdminTools() {
+    stopAdminScanning();
+    stopDuckRace();
   }
 
   document.addEventListener("visibilitychange", function () {

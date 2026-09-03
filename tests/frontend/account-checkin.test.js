@@ -201,11 +201,14 @@ describe("check-in tool inside the account page", () => {
     expect(q(window, "#login-section").hidden).toBe(false);
   });
 
-  it("uses the same session key as the raffle page so one login opens both tools", async () => {
-    expect(SUBSCRIPTIONS_JS).toContain('"hib.subscriptions.session"');
-
+  it("keeps session handling in one place: the raffle widget owns none of it", () => {
     const sorteio = fs.readFileSync(path.join(ROOT, "assets", "js", "sorteio.js"), "utf8");
-    expect(sorteio).toContain('"hib.subscriptions.session"');
+
+    expect(SUBSCRIPTIONS_JS).toContain('"hib.subscriptions.session"');
+    expect(sorteio).not.toContain("sessionStorage");
+    expect(sorteio).not.toContain("hib.subscriptions.session");
+    expect(sorteio).not.toContain("/api/auth/");
+    expect(sorteio).toContain("window.HIBDuckRace");
   });
 });
 

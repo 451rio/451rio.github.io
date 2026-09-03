@@ -100,12 +100,71 @@ sitemap: false
           Aponte a câmera para o QR code da pessoa.
         </p>
       </div>
-      <a class="btn btn-ghost" href="{{ '/sorteio/' | relative_url }}">Sorteio</a>
     </div>
     <video id="admin-checkin-video" class="checkin-video" playsinline muted></video>
     <div id="admin-checkin-result" class="checkin-result" role="status" aria-live="polite"></div>
   </section>
+
+  <section class="meetup-card" id="duckrace-section" hidden>
+    <div class="account-bar">
+      <div>
+        <h2>Corrida de patos 🦆</h2>
+        <p class="meetup-subtitle">Sorteia, entre quem já fez check-in, um vencedor por corrida.</p>
+      </div>
+    </div>
+
+    <div class="registration-field">
+      <label for="duckrace-meetup-select">Meetup</label>
+      <select id="duckrace-meetup-select" class="registration-input"></select>
+    </div>
+
+    <p class="meetup-subtitle" id="duckrace-status" role="status" aria-live="polite"></p>
+
+    <div class="duckrace-pond" id="duckrace-pond" hidden>
+      <div class="duckrace-lanes" id="duckrace-lanes"></div>
+      <div class="duckrace-finish" aria-hidden="true">
+        <span class="duckrace-finish-label">Chegada</span>
+      </div>
+    </div>
+
+    <div class="duckrace-actions">
+      <button class="btn btn-primary" type="button" id="duckrace-start-button" disabled>Iniciar corrida</button>
+      <button class="btn btn-ghost" type="button" id="duckrace-mute-button" aria-pressed="false">🔊 Som ligado</button>
+    </div>
+
+    <div class="duckrace-winner checkin-success" id="duckrace-winner" hidden role="status" aria-live="polite"></div>
+
+    <div class="duckrace-winners" id="duckrace-winners-section" hidden>
+      <h3>Já ganharam</h3>
+      <ul class="duckrace-winners-list" id="duckrace-winners-list"></ul>
+    </div>
+
+    <div class="duckrace-reset-row">
+      <button class="btn btn-danger" type="button" id="duckrace-reset-button" disabled>Resetar sorteio deste meetup</button>
+    </div>
+  </section>
 </main>
+
+<div class="modal" id="duckrace-reset-modal" aria-hidden="true">
+  <div class="modal-content modal-content--feedback" aria-labelledby="duckrace-reset-modal-title" aria-describedby="duckrace-reset-modal-message">
+    <button class="modal-close" data-close aria-label="Fechar">✕</button>
+    <h3 id="duckrace-reset-modal-title" class="registration-feedback-title">Resetar sorteio</h3>
+    <p id="duckrace-reset-modal-message" class="registration-feedback-message">
+      Isso apaga quem já ganhou neste meetup — todo mundo com check-in volta a ficar elegível.
+      Não pode ser desfeito.
+    </p>
+    <form id="duckrace-reset-form" class="cancel-form">
+      <label class="cancel-form-label" for="duckrace-reset-confirmation">
+        Para confirmar, digite <strong>RESETAR</strong> no campo abaixo.
+      </label>
+      <input id="duckrace-reset-confirmation" class="registration-input" type="text" placeholder="RESETAR" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" required>
+      <div class="cancel-form-actions">
+        <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
+        <button class="btn btn-danger" type="submit" id="duckrace-reset-confirm-button" disabled>Resetar sorteio</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <div class="modal" id="checkinModal" aria-hidden="true">
   <div class="modal-content modal-content--feedback">
@@ -148,4 +207,5 @@ sitemap: false
 <script src="{{ '/assets/js/vendor/qrcode.js' | relative_url }}"></script>
 <script defer src="{{ '/assets/js/vendor/jsQR.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/form-utils.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/sorteio.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/meetup-subscriptions.js' | relative_url }}"></script>
