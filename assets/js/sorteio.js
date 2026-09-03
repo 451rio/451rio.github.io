@@ -55,7 +55,7 @@
   const QUACK_MIN_GAP_MS = 450;
   const QUACK_GAP_SPREAD_MS = 900;
   const VICTORY_RUN_MS = 1600;
-  const VICTORY_RUN_PX = 42;
+  const VICTORY_RUN_PX = 64;
 
   let meetupsCache = [];
   let currentSlug = "";
@@ -164,29 +164,19 @@
       '</svg>';
   }
 
-  function densityFor(count) {
-    if (count <= 10) return "roomy";
-    if (count <= 30) return "cozy";
-    return "compact";
-  }
 
-  const MIN_READABLE_LANE = 18;
-  const MAX_COLUMNS = 4;
+  const COMFORT_LANE = 44;
+  const MIN_LANE = 24;
+  const VISIBLE_TARGET = 12;
 
   function availableHeight() {
     if (isFullscreen()) {
       const chrome = Array.from(stageEl.children)
         .filter((child) => child !== pondEl && !child.hidden)
         .reduce((total, child) => total + child.offsetHeight, 0);
-      return Math.max(240, stageEl.clientHeight - chrome - 24);
+      return Math.max(240, stageEl.clientHeight - chrome - POND_PADDING - 24);
     }
-    return Math.max(240, Math.round(window.innerHeight * 0.7));
-  }
-
-  function columnsFor(count) {
-    if (count <= 0) return 1;
-    const perColumn = Math.max(1, Math.floor(availableHeight() / MIN_READABLE_LANE));
-    return Math.max(1, Math.min(MAX_COLUMNS, Math.ceil(count / perColumn)));
+    return Math.max(240, Math.round(window.innerHeight * 0.68) - POND_PADDING);
   }
 
   function buildRunner(duck) {
@@ -226,40 +216,29 @@
 
     pondEl.hidden = false;
 
-    const columns = columnsFor(ducks.length);
-    const perColumn = Math.ceil(ducks.length / columns);
-    lanesEl.style.setProperty("--duckrace-columns", String(columns));
-    lanesEl.dataset.density = densityFor(perColumn);
+    const group = document.createElement("div");
+    group.className = "duckrace-lane-group";
 
-    for (let c = 0; c < columns; c += 1) {
-      const column = document.createElement("div");
-      column.className = "duckrace-column";
+    for (const duck of ducks) {
+      const lane = document.createElement("div");
+      lane.className = "duckrace-lane";
 
-      const group = document.createElement("div");
-      group.className = "duckrace-lane-group";
-
-      for (const duck of ducks.slice(c * perColumn, (c + 1) * perColumn)) {
-        const lane = document.createElement("div");
-        lane.className = "duckrace-lane";
-
-        const runner = buildRunner(duck);
-        lane.appendChild(runner);
-        group.appendChild(lane);
-        laneElements.set(duck.id, runner);
-      }
-
-      const finish = document.createElement("div");
-      finish.className = "duckrace-finish";
-      finish.setAttribute("aria-hidden", "true");
-      const label = document.createElement("span");
-      label.className = "duckrace-finish-label";
-      label.textContent = "Chegada";
-      finish.appendChild(label);
-
-      column.appendChild(group);
-      column.appendChild(finish);
-      lanesEl.appendChild(column);
+      const runner = buildRunner(duck);
+      lane.appendChild(runner);
+      group.appendChild(lane);
+      laneElements.set(duck.id, runner);
     }
+
+    const finish = document.createElement("div");
+    finish.className = "duckrace-finish";
+    finish.setAttribute("aria-hidden", "true");
+    const label = document.createElement("span");
+    label.className = "duckrace-finish-label";
+    label.textContent = "Chegada";
+    finish.appendChild(label);
+
+    lanesEl.appendChild(group);
+    lanesEl.appendChild(finish);
 
     fitStage();
   }
@@ -505,8 +484,7 @@
 
   const audio = createAudioEngine();
 
-  const FIT_MIN_LANE = 12;
-  const FIT_MAX_LANE = 46;
+  const POND_PADDING = 58;
 
   function fitStage() {
     if (currentDucks.length === 0) {
@@ -516,14 +494,13 @@
       return;
     }
 
-    const columns = Number(lanesEl.style.getPropertyValue("--duckrace-columns")) || 1;
-    const perColumn = Math.ceil(currentDucks.length / columns);
-    const lane = Math.max(FIT_MIN_LANE, Math.min(FIT_MAX_LANE, Math.floor(availableHeight() / perColumn)));
+    const lane = Math.max(MIN_LANE, Math.min(COMFORT_LANE, Math.floor(availableHeight() / VISIBLE_TARGET)));
 
     lanesEl.style.setProperty("--duckrace-lane-h", `${lane}px`);
-    lanesEl.style.setProperty("--duckrace-duck-w", `${Math.max(14, Math.round(lane * 0.9))}px`);
-    lanesEl.style.setProperty("--duckrace-name-size", `${Math.max(9, Math.round(lane * 0.4))}px`);
-    lanesEl.style.setProperty("--duckrace-name-max-w", `${Math.max(64, Math.round(lane * 6))}px`);
+    lanesEl.style.setProperty("--duckrace-duck-w", `${Math.max(20, Math.round(lane * 1.2))}px`);
+    lanesEl.style.setProperty("--duckrace-name-size", `${Math.max(10, Math.round(lane * 0.34))}px`);
+    lanesEl.style.setProperty("--duckrace-name-max-w", `${Math.max(90, Math.round(lane * 6))}px`);
+    pondEl.style.setProperty("--duckrace-pond-max-h", `${availableHeight()}px`);
   }
 
   function measureTrack(entry) {
@@ -589,6 +566,16 @@
     return Math.min(1, Math.max(0, u + surge + ripple));
   }
 
+  function revealWinnerLane(entry) {
+    const lane = entry.el.closest(".duckrace-lane");
+    if (!lane || typeof lane.scrollIntoView !== "function") return;
+    try {
+      lane.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch {
+      lane.scrollIntoView(false);
+    }
+  }
+
   function animateRace(winnerId) {
     return new Promise((resolve) => {
       const laneHeightPx = parseFloat(getComputedStyle(lanesEl).getPropertyValue("--duckrace-lane-h")) || 44;
@@ -642,6 +629,7 @@
         if (winnerCrossedAt === null && elapsed >= winnerEntry.finishTime) {
           winnerCrossedAt = elapsed;
           audio.playVictory();
+          revealWinnerLane(winnerEntry);
           entries.forEach((entry) => {
             if (!entry.isWinner) entry.frozenX = raceProgress(entry, elapsed) * entry.trackWidth;
           });

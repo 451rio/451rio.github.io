@@ -213,33 +213,33 @@ describe("duck race rendering", () => {
     expect(secondFill).toBe(firstFill);
   });
 
-  it("splits a large field into columns so every duck stays on screen", async () => {
-    mounted = mountPage({
-      ducks: Array.from({ length: 60 }, (_, i) => ({ id: i + 1, name: `Pessoa ${i}` }))
-    });
-    await sleep(300);
-
-    const { window } = mounted;
-    const lanes = window.document.getElementById("duckrace-lanes");
-    const columns = window.document.querySelectorAll(".duckrace-column");
-
-    expect(window.document.querySelectorAll(".duckrace-lane").length).toBe(60);
-    expect(columns.length).toBeGreaterThanOrEqual(1);
-    expect(Number(lanes.style.getPropertyValue("--duckrace-columns"))).toBe(columns.length);
-  });
-
-  it("gives every column its own finish line", async () => {
+  it("keeps every racer in one column behind a single finish strip", async () => {
     mounted = mountPage({
       ducks: Array.from({ length: 100 }, (_, i) => ({ id: i + 1, name: `Pessoa ${i}` }))
     });
     await sleep(300);
 
     const { window } = mounted;
-    const columns = window.document.querySelectorAll(".duckrace-column");
-    const finishes = window.document.querySelectorAll(".duckrace-finish");
-
     expect(window.document.querySelectorAll(".duckrace-lane").length).toBe(100);
-    expect(finishes.length).toBe(columns.length);
+    expect(window.document.querySelectorAll(".duckrace-lane-group").length).toBe(1);
+    expect(window.document.querySelectorAll(".duckrace-finish").length).toBe(1);
+  });
+
+  it("keeps ducks comfortably sized instead of shrinking them to fit the field", async () => {
+    const small = mountPage({ ducks: Array.from({ length: 10 }, (_, i) => ({ id: i + 1, name: `P${i}` })) });
+    await sleep(300);
+    const smallLane = small.window.document.getElementById("duckrace-lanes").style.getPropertyValue("--duckrace-lane-h");
+    small.dom.window.close();
+
+    mounted = mountPage({ ducks: Array.from({ length: 100 }, (_, i) => ({ id: i + 1, name: `P${i}` })) });
+    await sleep(300);
+    const bigLane = mounted.window.document.getElementById("duckrace-lanes").style.getPropertyValue("--duckrace-lane-h");
+
+    expect(parseInt(bigLane, 10)).toBeGreaterThanOrEqual(24);
+    expect(
+      parseInt(bigLane, 10),
+      "o tamanho do pato nao pode encolher so porque entrou mais gente na corrida"
+    ).toBe(parseInt(smallLane, 10));
   });
 
   it("keeps lanes readable instead of collapsing them for a huge field", async () => {

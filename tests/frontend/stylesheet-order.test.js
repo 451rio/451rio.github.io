@@ -22,8 +22,6 @@ describe("responsive overrides actually win the cascade", () => {
   const overridden = [
     ".duckrace-pond",
     ".duckrace-lanes",
-    '.duckrace-lanes[data-density="cozy"]',
-    '.duckrace-lanes[data-density="compact"]',
     ".duckrace-finish-label"
   ];
 
@@ -36,10 +34,32 @@ describe("responsive overrides actually win the cascade", () => {
     expect(mobile).toBeGreaterThan(base);
   });
 
-  it("keeps the finish strip width and the lane margin driven by one variable", () => {
-    expect(CSS).toContain("--duckrace-finish-w: 30px");
-    expect(CSS).toContain("margin-right: var(--duckrace-finish-w, 30px)");
-    expect(CSS).toContain("width: var(--duckrace-finish-w, 30px)");
+  it("leaves open water after the finish line for the winner to swim into", () => {
+    const pond = CSS.slice(CSS.indexOf(".duckrace-pond {"), CSS.indexOf(".duckrace-lanes {"));
+    expect(pond).toMatch(/--duckrace-finish-w:\s*\d+px/);
+    expect(pond).toMatch(/--duckrace-runout-w:\s*\d+px/);
+
+    expect(CSS).toContain("margin-right: calc(var(--duckrace-finish-w, 20px) + var(--duckrace-runout-w, 64px))");
+    expect(CSS).toContain("right: var(--duckrace-runout-w, 64px)");
+  });
+
+  it("keeps every duck in the water: the shore is a fixed strip, not a percentage", () => {
+    const pond = CSS.slice(CSS.indexOf(".duckrace-pond {"), CSS.indexOf(".duckrace-lanes {"));
+
+    expect(pond).toContain("--duckrace-shore-h");
+    expect(pond).toContain("padding-top: calc(var(--duckrace-shore-h)");
+
+    const gradient = pond.slice(pond.indexOf("linear-gradient(180deg,\n"), pond.indexOf("overflow"));
+    const waterStart = gradient.match(/#3a7ca5\s+([\d.]+)(px|%)/i);
+
+    expect(waterStart, "cor da agua nao encontrada no cenario").not.toBeNull();
+    expect(
+      waterStart[2],
+      "a linha d'agua precisa ser um deslocamento fixo; em % ela desce conforme o lago cresce e os primeiros patos nascem na grama"
+    ).toBe("px");
+
+    const shoreHeight = Number(pond.match(/--duckrace-shore-h:\s*(\d+)px/)[1]);
+    expect(Number(waterStart[1])).toBe(shoreHeight);
   });
 
   it("hides the flash overlay from assistive tech, not just visually", () => {
