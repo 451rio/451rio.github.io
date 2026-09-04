@@ -1347,9 +1347,13 @@ footer a {
 }
 
 .subscription-actions {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .subscription-note {
@@ -2090,6 +2094,29 @@ footer a {
   .blog-card,
   .blog-article {
     padding: 1.1rem;
+  }
+
+  .subscription-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .subscription-card-main {
+    flex: 0 0 auto;
+  }
+
+  .subscription-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .subscription-actions .btn {
+    flex: 1 1 auto;
+    white-space: normal;
+  }
+
+  .subscription-note {
+    max-width: none;
   }
 
 }
