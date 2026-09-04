@@ -299,7 +299,9 @@
 
     const certificate = registration.certificate || {};
 
-    if (!registration.canCancel) {
+    const canCheckin = Boolean(registration.canCheckin);
+
+    if (canCheckin) {
       const checkinButton = document.createElement("button");
       checkinButton.type = "button";
       checkinButton.className = "btn btn-ghost";
@@ -308,7 +310,9 @@
         openCheckinModal(registration);
       });
       actions.append(checkinButton);
+    }
 
+    if (registration.canCancel) {
       const cancelButton = document.createElement("button");
       cancelButton.type = "button";
       cancelButton.className = "btn btn-danger";
@@ -317,7 +321,11 @@
         openCancelModal(registration);
       });
       actions.append(cancelButton);
-    } else if (certificate.available) {
+    }
+
+    const eventOver = !canCheckin && !registration.canCancel;
+
+    if (eventOver && certificate.available) {
       const label = certificate.code
         ? "Reenviar certificado por e-mail"
         : "Receber certificado por e-mail";
@@ -330,7 +338,7 @@
         issueCertificate(registration, certificateButton, label);
       });
       actions.append(certificateButton);
-    } else {
+    } else if (eventOver) {
       const note = document.createElement("p");
       note.className = "subscription-note";
       if (!registration.checkedInAt) {

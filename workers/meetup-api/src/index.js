@@ -278,6 +278,17 @@ function isEventPast(eventDate) {
   return Date.now() > time;
 }
 
+const CHECKIN_LEAD_MINUTES = 10;
+
+function isCheckinWindowOpen(eventDate, durationMinutes) {
+  const start = Date.parse(String(eventDate || ""));
+  if (!Number.isFinite(start)) return false;
+  const opensAt = start - CHECKIN_LEAD_MINUTES * 60 * 1000;
+  const closesAt = start + Number(durationMinutes || 0) * 60 * 1000;
+  const now = Date.now();
+  return now >= opensAt && now <= closesAt;
+}
+
 const DISPOSABLE_EMAIL_DOMAINS = new Set([
   "mailinator.com",
   "guerrillamail.com",
@@ -1178,6 +1189,7 @@ async function handleMyRegistrations(env, session, corsOrigin) {
       registeredAt: row.created_at,
       isPast: past,
       canCancel: !past,
+      canCheckin: isCheckinWindowOpen(row.event_date, row.duration_minutes),
       xpReward: Number(row.xp_reward || 0),
       xpEarned: past ? Number(row.xp_reward || 0) : 0,
       checkedInAt: row.checked_in_at || null,

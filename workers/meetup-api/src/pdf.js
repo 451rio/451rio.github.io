@@ -1,6 +1,7 @@
 import {
   SIGNATURES,
   SEAL,
+  BACKGROUND,
   HELVETICA_WIDTHS,
   HELVETICA_BOLD_WIDTHS
 } from "./certificate-assets.js";
@@ -317,9 +318,26 @@ function drawBlocks(content, blocks, topY) {
 
 export function buildCertificatePdf(certificate) {
   const content = new Content();
+  const bgRegionH = PAGE_HEIGHT - BAND_HEIGHT;
+  const bgAspect = BACKGROUND.width / BACKGROUND.height;
+  let bgH = bgRegionH;
+  let bgW = bgH * bgAspect;
+  if (bgW < PAGE_WIDTH) {
+    bgW = PAGE_WIDTH;
+    bgH = bgW / bgAspect;
+  }
+  const bgX = (PAGE_WIDTH - bgW) / 2;
+  const bgY = BAND_HEIGHT + (bgRegionH - bgH) / 2;
 
   content.push("q");
-  content.push(`0 ${BAND_HEIGHT.toFixed(2)} ${PAGE_WIDTH.toFixed(2)} ${(PAGE_HEIGHT - BAND_HEIGHT).toFixed(2)} re W n`);
+  content.push(`0 ${BAND_HEIGHT.toFixed(2)} ${PAGE_WIDTH.toFixed(2)} ${bgRegionH.toFixed(2)} re W n`);
+  content.push(`${bgW.toFixed(2)} 0 0 ${bgH.toFixed(2)} ${bgX.toFixed(2)} ${bgY.toFixed(2)} cm`);
+  content.push("/ImBg Do");
+  content.push("Q");
+
+  content.push("q");
+  content.push(`0 ${BAND_HEIGHT.toFixed(2)} ${PAGE_WIDTH.toFixed(2)} ${bgRegionH.toFixed(2)} re W n`);
+  content.push("/GS1 gs");
   content.push("/Sh0 sh");
   content.push("Q");
 
@@ -361,7 +379,8 @@ export function buildCertificatePdf(certificate) {
     dict:
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH.toFixed(2)} ${PAGE_HEIGHT.toFixed(2)}] ` +
       `/Resources << /Font << /${FONT_REGULAR} 5 0 R /${FONT_BOLD} 6 0 R /${FONT_MONO} 7 0 R >> ` +
-      "/XObject << /ImSig 8 0 R /ImSeal 9 0 R >> /Shading << /Sh0 10 0 R >> >> /Contents 4 0 R >>"
+      "/XObject << /ImSig 8 0 R /ImSeal 9 0 R /ImBg 14 0 R >> /Shading << /Sh0 10 0 R >> " +
+      "/ExtGState << /GS1 15 0 R >> >> /Contents 4 0 R >>"
   });
   objects.push({dict: `<< /Length ${contentBytes.length} >>`, stream: contentBytes});
   objects.push({
@@ -408,6 +427,18 @@ export function buildCertificatePdf(certificate) {
   objects.push({
     dict:
       "<< /FunctionType 2 /Domain [0 1] /C0 [0.4196 0.3804 0.1412] /C1 [0.3412 0.3059 0.1137] /N 1 >>"
+  });
+
+  const backgroundBytes = deflateFromBase64(BACKGROUND.jpeg);
+  objects.push({
+    dict:
+      `<< /Type /XObject /Subtype /Image /Width ${BACKGROUND.width} /Height ${BACKGROUND.height} ` +
+      `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${backgroundBytes.length} >>`,
+    stream: backgroundBytes
+  });
+
+  objects.push({
+    dict: "<< /Type /ExtGState /ca 0.85 /CA 0.85 >>"
   });
 
   objects.push({
