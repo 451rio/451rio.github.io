@@ -1183,6 +1183,36 @@ footer a {
   padding: 1.2rem 1.2rem 1rem;
 }
 
+.modal-content--manage {
+  width: min(680px, 94vw);
+  text-align: left;
+}
+
+#manage-status.is-error,
+#meetup-form-status.is-error {
+  color: #ff8a8a;
+}
+
+#manage-status.is-success,
+#meetup-form-status.is-success {
+  color: #7de0ca;
+}
+
+.manage-form {
+  margin-bottom: 0.4rem;
+}
+
+.manage-row--pick {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.manage-row--pick:hover {
+  border-color: rgba(47, 195, 162, 0.45);
+}
+
 .registration-feedback-title {
   font-size: 1.15rem;
   margin-bottom: 0.5rem;
@@ -1365,6 +1395,81 @@ footer a {
 .subscription-empty {
   color: var(--text-muted);
   line-height: 1.6;
+}
+
+.manage-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.6rem 0 1rem;
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+.manage-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  background: rgba(11, 20, 26, 0.55);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.manage-row.is-present {
+  border-color: rgba(47, 195, 162, 0.45);
+  background: rgba(47, 195, 162, 0.10);
+}
+
+.manage-row.is-changed {
+  box-shadow: inset 3px 0 0 0 var(--accent);
+}
+
+.manage-check {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.manage-row-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.manage-row-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manage-row-email {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manage-row-tag {
+  flex: 0 0 auto;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: .03em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.manage-row.is-present .manage-row-tag {
+  color: #7de0ca;
+}
+
+.manage-actions {
+  margin-top: 0.4rem;
 }
 
 .cancel-form {

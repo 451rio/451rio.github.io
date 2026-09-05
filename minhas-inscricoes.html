@@ -146,6 +146,20 @@ sitemap: false
       <button class="btn btn-danger" type="button" id="duckrace-reset-button" disabled>Resetar sorteio deste meetup</button>
     </div>
   </section>
+
+  <section class="meetup-card" id="meetup-manage-section" hidden>
+    <div class="account-bar">
+      <div>
+        <h2>Gerenciamento de meetup</h2>
+        <p class="meetup-subtitle">Crie um novo meetup ou edite os dados e a presença de um já existente.</p>
+      </div>
+    </div>
+
+    <div class="duckrace-actions">
+      <button class="btn btn-primary" type="button" id="manage-create-button">Criar meetup</button>
+      <button class="btn btn-ghost" type="button" id="manage-edit-button">Editar meetup</button>
+    </div>
+  </section>
 </main>
 
 <div class="modal" id="duckrace-reset-modal" aria-hidden="true">
@@ -199,6 +213,79 @@ sitemap: false
   </div>
 </div>
 
+<div class="modal" id="meetupPickModal" aria-hidden="true">
+  <div class="modal-content modal-content--feedback modal-content--manage">
+    <button class="modal-close" data-close aria-label="Fechar">✕</button>
+    <h3 id="pick-modal-title" class="registration-feedback-title">Escolha o meetup para editar</h3>
+    <div class="registration-field registration-field-full">
+      <label for="pick-search">Buscar</label>
+      <input id="pick-search" class="registration-input" type="search" placeholder="Nome do meetup"
+             autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="manage-list" id="pick-list" role="group" aria-label="Meetups"></div>
+  </div>
+</div>
+
+<div class="modal" id="meetupFormModal" aria-hidden="true">
+  <div class="modal-content modal-content--feedback modal-content--manage">
+    <button class="modal-close" data-close aria-label="Fechar">✕</button>
+    <h3 id="meetup-form-title" class="registration-feedback-title">Criar meetup</h3>
+    <div class="registration-form manage-form">
+      <div class="registration-field registration-field-full">
+        <label for="mf-title">Título</label>
+        <input id="mf-title" class="registration-input" type="text" maxlength="200" placeholder="Meetup de Cibersegurança - 03/09/2026">
+      </div>
+      <div class="registration-field registration-field-full">
+        <label for="mf-slug">Slug (identificador na URL)</label>
+        <input id="mf-slug" class="registration-input" type="text" placeholder="meetup-03-09-2026"
+               autocapitalize="off" autocorrect="off" spellcheck="false">
+        <small class="registration-help" id="mf-slug-help">Letras minúsculas, números e hífens. Não pode ser alterado depois.</small>
+      </div>
+      <div class="registration-field">
+        <label for="mf-date">Data e hora</label>
+        <input id="mf-date" class="registration-input" type="datetime-local">
+      </div>
+      <div class="registration-field">
+        <label for="mf-duration">Duração (min)</label>
+        <input id="mf-duration" class="registration-input" type="number" min="1" step="1" value="240">
+      </div>
+      <div class="registration-field">
+        <label for="mf-capacity">Capacidade</label>
+        <input id="mf-capacity" class="registration-input" type="number" min="1" step="1" value="100">
+      </div>
+      <label class="registration-consent" for="mf-open">
+        <input id="mf-open" type="checkbox" checked>
+        <span>Aberto para inscrições</span>
+      </label>
+    </div>
+    <p class="meetup-subtitle" id="meetup-form-status" role="status" aria-live="polite"></p>
+    <div class="cancel-form-actions manage-actions">
+      <button class="btn btn-ghost" type="button" id="meetup-form-back" hidden>← Voltar</button>
+      <button class="btn btn-ghost" type="button" id="manage-export-button" hidden>Exportar inscritos</button>
+      <button class="btn btn-ghost" type="button" id="manage-attendance-button" hidden>Editar presença</button>
+      <button class="btn btn-primary" type="button" id="meetup-form-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="manageModal" aria-hidden="true">
+  <div class="modal-content modal-content--feedback modal-content--manage">
+    <button class="modal-close" data-close aria-label="Fechar">✕</button>
+    <h3 id="manage-modal-title" class="registration-feedback-title">Gerenciar check-in</h3>
+    <div class="registration-field registration-field-full">
+      <label for="manage-search">Buscar</label>
+      <input id="manage-search" class="registration-input" type="search" placeholder="Nome ou e-mail"
+             autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <p class="meetup-subtitle" id="manage-status" role="status" aria-live="polite"></p>
+    <div class="manage-list" id="manage-list" role="group" aria-label="Lista de participantes"></div>
+    <div class="cancel-form-actions manage-actions">
+      <button class="btn btn-ghost" type="button" id="manage-back-button">← Voltar</button>
+      <button class="btn btn-primary" type="button" id="manage-save-button" disabled>Salvar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="subscriptionFeedbackModal" aria-hidden="true">
   <div class="modal-content modal-content--feedback">
     <button class="modal-close" data-close aria-label="Fechar">✕</button>
@@ -211,4 +298,5 @@ sitemap: false
 <script defer src="{{ '/assets/js/vendor/jsQR.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/form-utils.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/sorteio.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/meetup-manage.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/meetup-subscriptions.js' | relative_url }}"></script>

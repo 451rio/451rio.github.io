@@ -135,6 +135,7 @@
     if (section !== listSection) {
       adminSection.hidden = true;
       stopDuckRace();
+      stopMeetupManage();
     }
   }
 
@@ -488,6 +489,7 @@
     adminStatus.textContent = "Ative a câmera para ler o QR code das pessoas.";
     adminSection.hidden = true;
     stopDuckRace();
+    stopMeetupManage();
     if (window.HIBFlash) window.HIBFlash.hide();
   }
 
@@ -606,6 +608,7 @@
     if (adminScanning) {
       adminSection.hidden = false;
       startDuckRace();
+      startMeetupManage();
       return;
     }
 
@@ -624,6 +627,7 @@
 
     adminSection.hidden = false;
     startDuckRace();
+    startMeetupManage();
   }
 
   function startDuckRace() {
@@ -646,10 +650,31 @@
     if (window.HIBDuckRace) window.HIBDuckRace.stop();
   }
 
+  function startMeetupManage() {
+    if (!window.HIBMeetupManage) return;
+    window.HIBMeetupManage.start({
+      apiFetch,
+      feedback,
+      onSessionExpired() {
+        stopAdminTools();
+        setSessionToken("");
+        showLogin(SESSION_EXPIRED_MESSAGE);
+      },
+      onForbidden() {
+        stopAdminTools();
+      }
+    });
+  }
+
+  function stopMeetupManage() {
+    if (window.HIBMeetupManage) window.HIBMeetupManage.stop();
+  }
+
   function stopAdminTools() {
     scannerRequested = false;
     stopAdminScanning();
     stopDuckRace();
+    stopMeetupManage();
   }
 
   adminToggle.addEventListener("click", function () {
