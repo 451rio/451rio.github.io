@@ -185,7 +185,7 @@ export function seedMeetup(env, overrides = {}) {
   const meetup = {
     slug: "meetup-teste",
     title: "Meetup de Teste",
-    event_date: "2026-09-03T19:00:00",
+    event_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19),
     capacity: 100,
     registrations_count: 0,
     is_open: 1,

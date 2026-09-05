@@ -53,6 +53,8 @@ function mountMeetup(status) {
     return { render: async () => {}, getToken: () => "c", getAnswer: () => "0", ready: () => true };
   };
   window.eval(MAIN_JS);
+  const regForm = window.document.getElementById("meetup-registration-form");
+  if (regForm) regForm.dataset.meetupDate = "2090-09-03";
   window.eval(REGISTRATION_JS);
 
   return { dom, window, errors };

@@ -50,7 +50,6 @@
   let formMode = "create";
   let editingSlug = "";
 
-  // Attendance state
   let records = [];
   const original = new Map();
   const pending = new Map();
@@ -76,7 +75,6 @@
     return new Date(time).toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit", year: "numeric"});
   }
 
-  // event_date is stored as Brazil wall-clock, e.g. "2026-09-03T18:50:00-03:00".
   function eventDateToInput(value) {
     const match = String(value || "").match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
     return match ? match[1] : "";
@@ -86,8 +84,6 @@
     if (!trimmed) return "";
     return `${trimmed.length === 16 ? trimmed : trimmed.slice(0, 16)}:00-03:00`;
   }
-
-  // ---- Meetup form (create / edit) ------------------------------------------
 
   function fillForm(meetup) {
     fTitle.value = meetup ? meetup.title || "" : "";
@@ -164,7 +160,7 @@
     const path = formMode === "create"
       ? "/api/admin/meetups"
       : `/api/admin/meetups/${encodeURIComponent(editingSlug)}`;
-    const method = formMode === "create" ? "POST" : "PATCH";
+    const method = "POST";
     if (formMode === "create") payload.slug = slug;
 
     formSave.disabled = true;
@@ -192,8 +188,6 @@
     await loadMeetups();
 
     if (created) {
-      // The meetup now exists — switch to edit mode so further saves update it
-      // (re-submitting as "create" would collide on the slug).
       formMode = "edit";
       editingSlug = slug;
       fSlug.disabled = true;
@@ -208,8 +202,6 @@
     formStatus.classList.remove("is-error");
     formStatus.classList.add("is-success");
   }
-
-  // ---- Pick list (choose a meetup to edit) ----------------------------------
 
   function renderPickList() {
     const query = normalize(pickSearch.value);
@@ -256,8 +248,6 @@
     await loadMeetups();
     renderPickList();
   }
-
-  // ---- Attendance (present / absent) ----------------------------------------
 
   function dirtyCount() {
     let count = 0;
@@ -414,16 +404,12 @@
       return;
     }
 
-    // Keep the modal open so the admin can keep editing; reflect the saved state
-    // locally and show an inline confirmation instead of a blocking dialog.
     const count = changes.length;
     records.forEach((record) => original.set(record.id, pending.get(record.id)));
     renderAttendance();
     manageStatus.textContent = `✓ Salvo (${count} alteração${count === 1 ? "" : "ões"}) · ${manageStatus.textContent}`;
     manageStatus.classList.add("is-success");
   }
-
-  // ---- Export registrants (name + email CSV) --------------------------------
 
   function csvField(value) {
     const s = String(value == null ? "" : value);
@@ -485,8 +471,6 @@
     formStatus.classList.add("is-success");
   }
 
-  // ---- Data -----------------------------------------------------------------
-
   async function loadMeetups() {
     let response, data;
     try {
@@ -499,8 +483,6 @@
     if (!response.ok || !Array.isArray(data.meetups)) return;
     meetupsCache = data.meetups;
   }
-
-  // ---- Wiring ---------------------------------------------------------------
 
   createButton.addEventListener("click", openCreate);
   editButton.addEventListener("click", openPick);

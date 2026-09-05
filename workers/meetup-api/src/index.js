@@ -6,7 +6,7 @@ function json(data, status = 200, corsOrigin = "*") {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "access-control-allow-origin": corsOrigin,
-      "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
+      "access-control-allow-methods": "GET,POST,OPTIONS",
       "access-control-allow-headers": "content-type,authorization",
       "cache-control": "no-store",
       vary: "Origin"
@@ -2657,7 +2657,7 @@ export default {
           status: 204,
           headers: {
             "access-control-allow-origin": corsOrigin,
-            "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
+            "access-control-allow-methods": "GET,POST,OPTIONS",
             "access-control-allow-headers": "content-type,authorization",
             vary: "Origin",
             "access-control-max-age": "3600"
@@ -2772,7 +2772,7 @@ export default {
       }
 
       const meetupUpdateMatch = url.pathname.match(/^\/api\/admin\/meetups\/([a-z0-9-]+)$/);
-      if (request.method === "PATCH" && meetupUpdateMatch) {
+      if (request.method === "POST" && meetupUpdateMatch) {
         return withSession(request, env, corsOrigin, (session) =>
           handleAdminUpdateMeetup(request, env, session, meetupUpdateMatch[1], corsOrigin)
         );
