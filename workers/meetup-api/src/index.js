@@ -1439,7 +1439,11 @@ async function handleAdminMeetupList(env, session, corsOrigin) {
 
   try {
     const rows = await env.DB
-      .prepare("SELECT slug, title, event_date FROM meetups ORDER BY event_date DESC")
+      .prepare(
+        "SELECT m.slug, m.title, m.event_date, m.duration_minutes, m.capacity, m.is_open, " +
+        "(SELECT COUNT(*) FROM registrations r WHERE r.meetup_slug = m.slug) AS registrations_count " +
+        "FROM meetups m ORDER BY m.event_date DESC"
+      )
       .all();
 
     return json(
@@ -1447,7 +1451,11 @@ async function handleAdminMeetupList(env, session, corsOrigin) {
         meetups: (rows.results || []).map((row) => ({
           slug: row.slug,
           title: row.title,
-          eventDate: row.event_date
+          eventDate: row.event_date,
+          durationMinutes: Number(row.duration_minutes),
+          capacity: Number(row.capacity),
+          isOpen: !!row.is_open,
+          registrationsCount: Number(row.registrations_count)
         }))
       },
       200,
@@ -1455,6 +1463,177 @@ async function handleAdminMeetupList(env, session, corsOrigin) {
     );
   } catch (err) {
     return serverError(corsOrigin, "admin:meetupList", err);
+  }
+}
+
+function validateMeetupInput(body, {requireSlug}) {
+  const result = {};
+
+  if (requireSlug) {
+    const slug = String(body.slug || "").trim().toLowerCase();
+    if (!/^[a-z0-9-]{3,64}$/.test(slug)) {
+      return {error: "Slug inválido. Use letras minúsculas, números e hífens (3 a 64 caracteres)."};
+    }
+    result.slug = slug;
+  }
+
+  const title = String(body.title || "").trim();
+  if (!title || title.length > 200) {
+    return {error: "Título obrigatório (até 200 caracteres)."};
+  }
+  result.title = title;
+
+  const eventDate = String(body.eventDate || "").trim();
+  if (!Number.isFinite(Date.parse(eventDate))) {
+    return {error: "Data do evento inválida."};
+  }
+  result.eventDate = eventDate;
+
+  const capacity = Number(body.capacity);
+  if (!Number.isInteger(capacity) || capacity <= 0) {
+    return {error: "Capacidade deve ser um número inteiro maior que zero."};
+  }
+  result.capacity = capacity;
+
+  const rawDuration = body.durationMinutes;
+  const durationMinutes = rawDuration === undefined || rawDuration === null || rawDuration === ""
+    ? 240
+    : Number(rawDuration);
+  if (!Number.isInteger(durationMinutes) || durationMinutes <= 0) {
+    return {error: "Duração deve ser um número de minutos maior que zero."};
+  }
+  result.durationMinutes = durationMinutes;
+
+  result.isOpen = body.isOpen ? 1 : 0;
+  return {values: result};
+}
+
+async function handleAdminCreateMeetup(request, env, session, corsOrigin) {
+  if (!isAdminEmail(session.email, env)) {
+    return json({error: "Acesso restrito à organização."}, 403, corsOrigin);
+  }
+
+  const parsed = await readJsonBody(request, corsOrigin);
+  if (parsed.error) return parsed.error;
+
+  const {values, error} = validateMeetupInput(parsed.body, {requireSlug: true});
+  if (error) return json({error}, 400, corsOrigin);
+
+  try {
+    const existing = await env.DB
+      .prepare("SELECT slug FROM meetups WHERE slug = ?")
+      .bind(values.slug)
+      .first();
+    if (existing) return json({error: "Já existe um meetup com esse slug."}, 409, corsOrigin);
+
+    await env.DB
+      .prepare(
+        "INSERT INTO meetups (slug, title, event_date, capacity, is_open, duration_minutes) VALUES (?, ?, ?, ?, ?, ?)"
+      )
+      .bind(values.slug, values.title, values.eventDate, values.capacity, values.isOpen, values.durationMinutes)
+      .run();
+
+    return json({ok: true, slug: values.slug}, 200, corsOrigin);
+  } catch (err) {
+    return serverError(corsOrigin, "admin:createMeetup", err);
+  }
+}
+
+async function handleAdminUpdateMeetup(request, env, session, slug, corsOrigin) {
+  if (!isAdminEmail(session.email, env)) {
+    return json({error: "Acesso restrito à organização."}, 403, corsOrigin);
+  }
+
+  const parsed = await readJsonBody(request, corsOrigin);
+  if (parsed.error) return parsed.error;
+
+  const {values, error} = validateMeetupInput(parsed.body, {requireSlug: false});
+  if (error) return json({error}, 400, corsOrigin);
+
+  try {
+    const meetup = await getMeetupBySlug(env.DB, slug);
+    if (!meetup) return json({error: "Meetup not found"}, 404, corsOrigin);
+
+    await env.DB
+      .prepare(
+        "UPDATE meetups SET title = ?, event_date = ?, capacity = ?, is_open = ?, duration_minutes = ?, updated_at = CURRENT_TIMESTAMP WHERE slug = ?"
+      )
+      .bind(values.title, values.eventDate, values.capacity, values.isOpen, values.durationMinutes, slug)
+      .run();
+
+    return json({ok: true}, 200, corsOrigin);
+  } catch (err) {
+    return serverError(corsOrigin, "admin:updateMeetup", err);
+  }
+}
+
+async function handleAdminAttendanceList(env, session, slug, corsOrigin) {
+  if (!isAdminEmail(session.email, env)) {
+    return json({error: "Acesso restrito à organização."}, 403, corsOrigin);
+  }
+
+  try {
+    const meetup = await getMeetupBySlug(env.DB, slug);
+    if (!meetup) return json({error: "Meetup not found"}, 404, corsOrigin);
+
+    const rows = await env.DB
+      .prepare(
+        "SELECT id, name, email, checked_in_at FROM registrations WHERE meetup_slug = ? ORDER BY name COLLATE NOCASE"
+      )
+      .bind(slug)
+      .all();
+
+    const registrations = (rows.results || []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      present: !!row.checked_in_at
+    }));
+
+    return json({meetupTitle: meetup.title, registrations}, 200, corsOrigin);
+  } catch (err) {
+    return serverError(corsOrigin, "admin:attendanceList", err);
+  }
+}
+
+async function handleAdminAttendanceUpdate(request, env, session, slug, corsOrigin) {
+  if (!isAdminEmail(session.email, env)) {
+    return json({error: "Acesso restrito à organização."}, 403, corsOrigin);
+  }
+
+  const parsed = await readJsonBody(request, corsOrigin);
+  if (parsed.error) return parsed.error;
+
+  const changes = Array.isArray(parsed.body.changes) ? parsed.body.changes : null;
+  if (!changes) return json({error: "Formato inválido."}, 400, corsOrigin);
+  if (changes.length === 0) return json({ok: true, updated: 0}, 200, corsOrigin);
+  if (changes.length > 1000) return json({error: "Muitas alterações de uma vez."}, 400, corsOrigin);
+
+  const statements = [];
+  for (const change of changes) {
+    const id = Number(change.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return json({error: "Alteração inválida."}, 400, corsOrigin);
+    }
+    statements.push(
+      change.present
+        ? env.DB
+            .prepare(
+              "UPDATE registrations SET checked_in_at = CURRENT_TIMESTAMP WHERE id = ? AND meetup_slug = ? AND checked_in_at IS NULL"
+            )
+            .bind(id, slug)
+        : env.DB
+            .prepare("UPDATE registrations SET checked_in_at = NULL WHERE id = ? AND meetup_slug = ?")
+            .bind(id, slug)
+    );
+  }
+
+  try {
+    const results = await env.DB.batch(statements);
+    const updated = results.reduce((sum, r) => sum + ((r.meta && r.meta.changes) || 0), 0);
+    return json({ok: true, updated}, 200, corsOrigin);
+  } catch (err) {
+    return serverError(corsOrigin, "admin:attendanceUpdate", err);
   }
 }
 
@@ -2583,6 +2762,31 @@ export default {
       if (request.method === "GET" && url.pathname === "/api/admin/meetups") {
         return withSession(request, env, corsOrigin, (session) =>
           handleAdminMeetupList(env, session, corsOrigin)
+        );
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/admin/meetups") {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleAdminCreateMeetup(request, env, session, corsOrigin)
+        );
+      }
+
+      const meetupUpdateMatch = url.pathname.match(/^\/api\/admin\/meetups\/([a-z0-9-]+)$/);
+      if (request.method === "POST" && meetupUpdateMatch) {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleAdminUpdateMeetup(request, env, session, meetupUpdateMatch[1], corsOrigin)
+        );
+      }
+
+      const attendanceMatch = url.pathname.match(/^\/api\/admin\/meetups\/([a-z0-9-]+)\/attendance$/);
+      if (request.method === "GET" && attendanceMatch) {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleAdminAttendanceList(env, session, attendanceMatch[1], corsOrigin)
+        );
+      }
+      if (request.method === "POST" && attendanceMatch) {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleAdminAttendanceUpdate(request, env, session, attendanceMatch[1], corsOrigin)
         );
       }
 
