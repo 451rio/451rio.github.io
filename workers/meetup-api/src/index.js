@@ -2645,6 +2645,144 @@ async function handleTalkSubmit(request, env, corsOrigin) {
   );
 }
 
+// Perguntas da pesquisa de satisfação. A ordem e as chaves acompanham
+// _data/satisfaction_survey.yml; a escala vai de 1 (pior) a 5 (melhor).
+const SURVEY_QUESTIONS = [
+  {key: "preEventCommunication", column: "pre_event_communication"},
+  {key: "organization", column: "organization"},
+  {key: "venue", column: "venue"},
+  {key: "techInfrastructure", column: "tech_infrastructure"},
+  {key: "talks", column: "talks"},
+  {key: "coffeeBreak", column: "coffee_break"},
+  {key: "rafflePrizes", column: "raffle_prizes"},
+  {key: "networking", column: "networking"},
+  {key: "overallExperience", column: "overall_experience"},
+  {key: "expectations", column: "expectations"},
+  {key: "recommendation", column: "recommendation"}
+];
+
+const SURVEY_COMMENTS_MAX_LENGTH = 2000;
+
+async function handleSurveySubmit(request, env, slug, corsOrigin) {
+  const parsed = await readJsonBody(request, corsOrigin);
+  if (parsed.error) return parsed.error;
+  const body = parsed.body;
+
+  const ratings = [];
+  for (const question of SURVEY_QUESTIONS) {
+    const value = Number(body[question.key]);
+    if (!Number.isInteger(value) || value < 1 || value > 5) {
+      return json({error: "Responda todas as perguntas obrigatórias"}, 400, corsOrigin);
+    }
+    ratings.push(value);
+  }
+
+  const comments = String(body.comments || "").trim();
+  if (comments.length > SURVEY_COMMENTS_MAX_LENGTH) {
+    return json({error: "Comentário muito longo"}, 400, corsOrigin);
+  }
+
+  const captchaId = String(body.captchaId || "");
+  const captchaValue = Number(body.captcha);
+  if (!captchaId || !Number.isFinite(captchaValue)) {
+    return json({error: "Verificação obrigatória"}, 400, corsOrigin);
+  }
+
+  let meetup;
+  try {
+    meetup = await getMeetupBySlug(env.DB, slug);
+  } catch (err) {
+    return serverError(corsOrigin, "getMeetup", err);
+  }
+
+  if (!meetup) return json({error: "Meetup not found"}, 404, corsOrigin);
+
+  if (!(await consumeCaptcha(env, captchaId, captchaValue))) {
+    return json({error: "Verificação inválida ou expirada. Tente novamente."}, 400, corsOrigin);
+  }
+
+  const columns = SURVEY_QUESTIONS.map((question) => question.column).join(", ");
+  const placeholders = SURVEY_QUESTIONS.map(() => "?").join(", ");
+
+  try {
+    await env.DB
+      .prepare(
+        `INSERT INTO satisfaction_surveys (meetup_slug, ${columns}, comments) VALUES (?, ${placeholders}, ?)`
+      )
+      .bind(slug, ...ratings, comments || null)
+      .run();
+  } catch (err) {
+    return serverError(corsOrigin, "survey:insert", err);
+  }
+
+  return json(
+    {ok: true, message: "Resposta registrada com sucesso"},
+    201,
+    corsOrigin
+  );
+}
+
+async function handleAdminSurveyResults(env, session, slug, corsOrigin) {
+  if (!isAdminEmail(session.email, env)) {
+    return json({error: "Acesso restrito à organização."}, 403, corsOrigin);
+  }
+
+  let meetup;
+  try {
+    meetup = await getMeetupBySlug(env.DB, slug);
+  } catch (err) {
+    return serverError(corsOrigin, "getMeetup", err);
+  }
+
+  if (!meetup) return json({error: "Meetup not found"}, 404, corsOrigin);
+
+  let rows;
+  try {
+    const columns = SURVEY_QUESTIONS.map((question) => question.column).join(", ");
+    const result = await env.DB
+      .prepare(
+        `SELECT ${columns}, comments, created_at FROM satisfaction_surveys ` +
+        "WHERE meetup_slug = ? ORDER BY created_at DESC, id DESC"
+      )
+      .bind(slug)
+      .all();
+    rows = result.results || [];
+  } catch (err) {
+    return serverError(corsOrigin, "admin:surveyResults", err);
+  }
+
+  const questions = SURVEY_QUESTIONS.map((question) => {
+    const counts = [0, 0, 0, 0, 0];
+    let sum = 0;
+    for (const row of rows) {
+      const value = Number(row[question.column]);
+      if (!Number.isInteger(value) || value < 1 || value > 5) continue;
+      counts[value - 1] += 1;
+      sum += value;
+    }
+    return {
+      key: question.key,
+      counts,
+      average: rows.length > 0 ? sum / rows.length : null
+    };
+  });
+
+  const comments = rows
+    .filter((row) => typeof row.comments === "string" && row.comments.trim())
+    .map((row) => ({text: row.comments.trim(), createdAt: row.created_at}));
+
+  return json(
+    {
+      meetup: {slug: meetup.slug, title: meetup.title, eventDate: meetup.event_date},
+      totalResponses: rows.length,
+      questions,
+      comments
+    },
+    200,
+    corsOrigin
+  );
+}
+
 export default {
   async fetch(request, env, ctx) {
     const corsOrigin = getCorsOrigin(request, env);
@@ -2677,6 +2815,11 @@ export default {
       const registerMatch = url.pathname.match(/^\/api\/meetups\/([a-z0-9-]+)\/register$/);
       if (request.method === "POST" && registerMatch) {
         return handleRegister(request, env, registerMatch[1], corsOrigin);
+      }
+
+      const surveyMatch = url.pathname.match(/^\/api\/meetups\/([a-z0-9-]+)\/survey$/);
+      if (request.method === "POST" && surveyMatch) {
+        return handleSurveySubmit(request, env, surveyMatch[1], corsOrigin);
       }
 
       if (request.method === "POST" && url.pathname === "/api/sponsors") {
@@ -2787,6 +2930,13 @@ export default {
       if (request.method === "POST" && attendanceMatch) {
         return withSession(request, env, corsOrigin, (session) =>
           handleAdminAttendanceUpdate(request, env, session, attendanceMatch[1], corsOrigin)
+        );
+      }
+
+      const surveyResultsMatch = url.pathname.match(/^\/api\/admin\/meetups\/([a-z0-9-]+)\/survey$/);
+      if (request.method === "GET" && surveyResultsMatch) {
+        return withSession(request, env, corsOrigin, (session) =>
+          handleAdminSurveyResults(env, session, surveyResultsMatch[1], corsOrigin)
         );
       }
 

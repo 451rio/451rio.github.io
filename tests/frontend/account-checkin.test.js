@@ -113,7 +113,7 @@ describe("check-in tool inside the account page", () => {
     await sleep(300);
 
     expect(mounted.cameraCalls).toEqual([]);
-    expect(q(mounted.window, "#admin-checkin-section").hidden).toBe(true);
+    expect(q(mounted.window, "#admin-panel").hidden).toBe(true);
     expect(mounted.errors).toEqual([]);
   });
 
@@ -151,7 +151,7 @@ describe("check-in tool inside the account page", () => {
     mounted = mountAccount({ isAdmin: true });
     await sleep(300);
 
-    expect(q(mounted.window, "#admin-checkin-section").hidden).toBe(false);
+    expect(q(mounted.window, "#admin-panel").hidden).toBe(false);
     expect(mounted.cameraCalls).toEqual([]);
     expect(q(mounted.window, "#admin-checkin-video").hidden).toBe(true);
     expect(q(mounted.window, "#admin-checkin-toggle").textContent).toContain("Ativar");
@@ -208,7 +208,7 @@ describe("check-in tool inside the account page", () => {
     await sleep(200);
 
     expect(mounted.stoppedTracks.length).toBeGreaterThan(0);
-    expect(q(mounted.window, "#admin-checkin-section").hidden).toBe(true);
+    expect(q(mounted.window, "#admin-panel").hidden).toBe(true);
     expect(q(mounted.window, "#admin-checkin-video").srcObject).toBe(null);
   });
 
@@ -227,14 +227,14 @@ describe("check-in tool inside the account page", () => {
     await sleep(300);
     q(mounted.window, "#admin-checkin-toggle").click();
     await sleep(200);
-    expect(q(mounted.window, "#admin-checkin-section").hidden).toBe(false);
+    expect(q(mounted.window, "#admin-panel").hidden).toBe(false);
 
     const { window } = mounted;
     window.fetch = async () => ({ ok: false, status: 401, json: async () => ({}) });
     q(window, "#retry-button").click();
     await sleep(300);
 
-    expect(q(window, "#admin-checkin-section").hidden).toBe(true);
+    expect(q(window, "#admin-panel").hidden).toBe(true);
     expect(mounted.stoppedTracks.length).toBeGreaterThan(0);
     expect(q(window, "#login-section").hidden).toBe(false);
   });
@@ -280,7 +280,7 @@ describe("account page login gate", () => {
     await sleep(300);
 
     expect(dom.window.document.getElementById("login-section").hidden).toBe(false);
-    expect(dom.window.document.getElementById("admin-checkin-section").hidden).toBe(true);
+    expect(dom.window.document.getElementById("admin-panel").hidden).toBe(true);
     expect(cameraCalls).toEqual([]);
     dom.window.close();
   });

@@ -44,6 +44,7 @@
   const feedbackTitle = document.getElementById("subscription-feedback-title");
   const feedbackMessage = document.getElementById("subscription-feedback-message");
 
+  const adminPanel = document.getElementById("admin-panel");
   const adminSection = document.getElementById("admin-checkin-section");
   const adminStatus = document.getElementById("admin-checkin-status");
   const adminVideo = document.getElementById("admin-checkin-video");
@@ -59,7 +60,7 @@
     checkinModal, checkinQrContainer,
     cancelModal, cancelForm, cancelMessage, cancelInput, cancelSubmit, cancelWordLabel,
     feedbackModal, feedbackTitle, feedbackMessage,
-    adminSection, adminStatus, adminVideo, adminResult, adminToggle
+    adminPanel, adminSection, adminStatus, adminVideo, adminResult, adminToggle
   ];
   if (requiredNodes.some((node) => !node)) return;
 
@@ -133,9 +134,10 @@
     listSection.hidden = section !== listSection;
     profileSection.hidden = section !== listSection;
     if (section !== listSection) {
-      adminSection.hidden = true;
+      adminPanel.hidden = true;
       stopDuckRace();
       stopMeetupManage();
+      stopSurveyResults();
     }
   }
 
@@ -487,9 +489,10 @@
     adminToggle.textContent = "Ativar câmera";
     adminToggle.setAttribute("aria-pressed", "false");
     adminStatus.textContent = "Ative a câmera para ler o QR code das pessoas.";
-    adminSection.hidden = true;
+    adminPanel.hidden = true;
     stopDuckRace();
     stopMeetupManage();
+    stopSurveyResults();
     if (window.HIBFlash) window.HIBFlash.hide();
   }
 
@@ -577,7 +580,7 @@
   }
 
   async function startAdminScanning() {
-    adminSection.hidden = false;
+    adminPanel.hidden = false;
     adminVideo.hidden = false;
     adminToggle.textContent = "Desligar câmera";
     adminToggle.setAttribute("aria-pressed", "true");
@@ -606,9 +609,10 @@
 
   async function checkAdminAccess() {
     if (adminScanning) {
-      adminSection.hidden = false;
+      adminPanel.hidden = false;
       startDuckRace();
       startMeetupManage();
+      startSurveyResults();
       return;
     }
 
@@ -621,13 +625,14 @@
 
     const { response, data } = result;
     if (!response.ok || !data.isAdmin) {
-      adminSection.hidden = true;
+      adminPanel.hidden = true;
       return;
     }
 
-    adminSection.hidden = false;
+    adminPanel.hidden = false;
     startDuckRace();
     startMeetupManage();
+    startSurveyResults();
   }
 
   function startDuckRace() {
@@ -670,11 +675,31 @@
     if (window.HIBMeetupManage) window.HIBMeetupManage.stop();
   }
 
+  function startSurveyResults() {
+    if (!window.HIBSurveyResults) return;
+    window.HIBSurveyResults.start({
+      apiFetch,
+      onSessionExpired() {
+        stopAdminTools();
+        setSessionToken("");
+        showLogin(SESSION_EXPIRED_MESSAGE);
+      },
+      onForbidden() {
+        stopAdminTools();
+      }
+    });
+  }
+
+  function stopSurveyResults() {
+    if (window.HIBSurveyResults) window.HIBSurveyResults.stop();
+  }
+
   function stopAdminTools() {
     scannerRequested = false;
     stopAdminScanning();
     stopDuckRace();
     stopMeetupManage();
+    stopSurveyResults();
   }
 
   adminToggle.addEventListener("click", function () {

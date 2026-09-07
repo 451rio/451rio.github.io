@@ -1,0 +1,72 @@
+---
+layout: default
+title: Pesquisa de satisfação | Hack in Brasil
+permalink: /pesquisa-de-satisfacao/
+---
+{% include nav.html tag="Pesquisa" back_url="/" back_label="Voltar para início" %}
+
+<main class="meetup-page">
+  <section class="meetup-card">
+    <p class="hero-kicker">Sua opinião</p>
+    <h1 class="meetup-title">Pesquisa de satisfação</h1>
+    <p class="meetup-subtitle">
+      Agradecemos por participar do Hack in Brasil! Compartilhe conosco como foi a sua experiência,
+      para que possamos melhorar para as próximas edições. E não tente hackear o formulário!
+    </p>
+    <p class="survey-anon-badge">Resposta anônima — não pedimos nome, e-mail nem documento.</p>
+  </section>
+
+  <section class="meetup-card">
+    <h2 id="survey-meetup-title">Como foi o meetup para você?</h2>
+    <form id="survey-form" class="registration-form"
+          data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev"
+          data-meetup-slug="meetup-03-09-2026">
+      <div class="registration-field registration-field-full">
+        <p class="registration-help" id="survey-captcha-status" role="status" aria-live="polite">Verificação de segurança: preparando...</p>
+      </div>
+      <div id="survey-form-fields" class="form-gate" hidden>
+        <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
+
+        {% for question in site.data.satisfaction_survey %}
+        <fieldset class="registration-field registration-field-full registration-fieldset survey-question">
+          <legend>{{ question.label }}</legend>
+          <div class="registration-radio-group survey-scale">
+            {% for option in question.options %}
+            <label class="registration-radio survey-scale-option">
+              <input type="radio" name="{{ question.key }}" value="{{ forloop.index }}" required>
+              <span class="survey-scale-value">{{ forloop.index }}</span>
+              <span>{{ option }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        {% endfor %}
+
+        <div class="registration-field registration-field-full">
+          <label for="survey-comments">Deixe aqui seus mais sinceros comentários!</label>
+          <textarea id="survey-comments" class="registration-input registration-textarea" name="comments"
+                    rows="5" maxlength="2000" placeholder="Opcional. O que funcionou bem, o que podemos melhorar..."></textarea>
+          <small class="registration-help">Opcional, até 2000 caracteres.</small>
+        </div>
+
+        <div class="registration-actions">
+          <button class="btn btn-primary" type="submit" id="survey-submit">Enviar respostas</button>
+        </div>
+      </div>
+    </form>
+  </section>
+</main>
+
+<div class="modal" id="surveyFeedbackModal" aria-hidden="true">
+  <div class="modal-content modal-content--feedback">
+    <button class="modal-close" data-close aria-label="Fechar">✕</button>
+    <h3 id="survey-feedback-title" class="registration-feedback-title"></h3>
+    <p id="survey-feedback-message" class="registration-feedback-message"></p>
+  </div>
+</div>
+
+<script>
+  window.HIBSurveyQuestions = {{ site.data.satisfaction_survey | jsonify }};
+</script>
+<script src="{{ '/assets/js/form-utils.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/satisfaction-survey.js' | relative_url }}"></script>

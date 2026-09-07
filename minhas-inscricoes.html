@@ -92,22 +92,47 @@ sitemap: false
     <div class="subscription-list" id="subscription-list" role="region" aria-live="polite" aria-label="Lista de inscrições"></div>
   </section>
 
-  <section class="meetup-card" id="admin-checkin-section" hidden>
-    <div class="account-bar">
-      <div>
-        <h2>Check-in da organização</h2>
-        <p class="meetup-subtitle" id="admin-checkin-status" role="status" aria-live="polite">
-          Aponte a câmera para o QR code da pessoa.
-        </p>
+  <div id="admin-panel" hidden>
+    <section class="meetup-card admin-tabs-card">
+      <div class="account-bar">
+        <div>
+          <h2>Painel da organização</h2>
+          <p class="meetup-subtitle">Ferramentas restritas a quem organiza o Hack in Brasil.</p>
+        </div>
       </div>
-    </div>
-    <div class="duckrace-actions">
-      <button class="btn btn-primary" type="button" id="admin-checkin-toggle">Ativar câmera</button>
-    </div>
-    <video id="admin-checkin-video" class="checkin-video" playsinline muted hidden></video>
-    <div id="admin-checkin-result" class="checkin-result" role="status" aria-live="polite"></div>
-  </section>
+      <div class="admin-tabs" id="admin-tabs" role="tablist" aria-label="Ferramentas da organização">
+        <button class="admin-tab" type="button" role="tab" id="admin-tab-checkin"
+                data-tab="checkin" aria-selected="true" aria-controls="admin-panel-checkin">Check-in</button>
+        <button class="admin-tab" type="button" role="tab" id="admin-tab-duckrace"
+                data-tab="duckrace" aria-selected="false" aria-controls="admin-panel-duckrace">Corrida de patos</button>
+        <button class="admin-tab" type="button" role="tab" id="admin-tab-manage"
+                data-tab="manage" aria-selected="false" aria-controls="admin-panel-manage">Meetups</button>
+        <button class="admin-tab" type="button" role="tab" id="admin-tab-survey"
+                data-tab="survey" aria-selected="false" aria-controls="admin-panel-survey">Pesquisa de satisfação</button>
+      </div>
+    </section>
 
+    <div class="admin-tabpanel" id="admin-panel-checkin" data-tab="checkin"
+         role="tabpanel" aria-labelledby="admin-tab-checkin" hidden>
+      <section class="meetup-card" id="admin-checkin-section">
+        <div class="account-bar">
+          <div>
+            <h2>Check-in da organização</h2>
+            <p class="meetup-subtitle" id="admin-checkin-status" role="status" aria-live="polite">
+              Aponte a câmera para o QR code da pessoa.
+            </p>
+          </div>
+        </div>
+        <div class="duckrace-actions">
+          <button class="btn btn-primary" type="button" id="admin-checkin-toggle">Ativar câmera</button>
+        </div>
+        <video id="admin-checkin-video" class="checkin-video" playsinline muted hidden></video>
+        <div id="admin-checkin-result" class="checkin-result" role="status" aria-live="polite"></div>
+      </section>
+    </div>
+
+    <div class="admin-tabpanel" id="admin-panel-duckrace" data-tab="duckrace"
+         role="tabpanel" aria-labelledby="admin-tab-duckrace" hidden>
   <section class="meetup-card" id="duckrace-section" hidden>
     <div class="account-bar">
       <div>
@@ -146,20 +171,57 @@ sitemap: false
       <button class="btn btn-danger" type="button" id="duckrace-reset-button" disabled>Resetar sorteio deste meetup</button>
     </div>
   </section>
-
-  <section class="meetup-card" id="meetup-manage-section" hidden>
-    <div class="account-bar">
-      <div>
-        <h2>Gerenciamento de meetup</h2>
-        <p class="meetup-subtitle">Crie um novo meetup ou edite os dados e a presença de um já existente.</p>
-      </div>
     </div>
 
-    <div class="duckrace-actions">
-      <button class="btn btn-primary" type="button" id="manage-create-button">Criar meetup</button>
-      <button class="btn btn-ghost" type="button" id="manage-edit-button">Editar meetup</button>
+    <div class="admin-tabpanel" id="admin-panel-manage" data-tab="manage"
+         role="tabpanel" aria-labelledby="admin-tab-manage" hidden>
+      <section class="meetup-card" id="meetup-manage-section" hidden>
+        <div class="account-bar">
+          <div>
+            <h2>Gerenciamento de meetup</h2>
+            <p class="meetup-subtitle">Crie um novo meetup ou edite os dados e a presença de um já existente.</p>
+          </div>
+        </div>
+
+        <div class="duckrace-actions">
+          <button class="btn btn-primary" type="button" id="manage-create-button">Criar meetup</button>
+          <button class="btn btn-ghost" type="button" id="manage-edit-button">Editar meetup</button>
+        </div>
+      </section>
     </div>
-  </section>
+
+    <div class="admin-tabpanel" id="admin-panel-survey" data-tab="survey"
+         role="tabpanel" aria-labelledby="admin-tab-survey" hidden>
+      <section class="meetup-card" id="survey-results-section" hidden>
+        <div class="account-bar">
+          <div>
+            <h2>Pesquisa de satisfação</h2>
+            <p class="meetup-subtitle">
+              Respostas anônimas enviadas em
+              <a href="{{ '/pesquisa-de-satisfacao/' | relative_url }}" target="_blank" rel="noopener noreferrer">/pesquisa-de-satisfacao/</a>.
+            </p>
+          </div>
+          <button class="btn btn-ghost" type="button" id="survey-results-reload">Atualizar</button>
+        </div>
+
+        <div class="registration-field">
+          <label for="survey-results-meetup-select">Meetup</label>
+          <select id="survey-results-meetup-select" class="registration-input"></select>
+        </div>
+
+        <p class="meetup-subtitle" id="survey-results-status" role="status" aria-live="polite">Carregando respostas...</p>
+
+        <div class="survey-stats" id="survey-results-summary"></div>
+        <div class="survey-charts" id="survey-results-charts"></div>
+
+        <div class="survey-comments" id="survey-results-comments-section" hidden>
+          <h3>Comentários</h3>
+          <p class="meetup-subtitle" id="survey-results-comments-count"></p>
+          <ul class="survey-comment-list" id="survey-results-comments-list"></ul>
+        </div>
+      </section>
+    </div>
+  </div>
 </main>
 
 <div class="modal" id="duckrace-reset-modal" aria-hidden="true">
@@ -294,9 +356,14 @@ sitemap: false
   </div>
 </div>
 
+<script>
+  window.HIBSurveyQuestions = {{ site.data.satisfaction_survey | jsonify }};
+</script>
 <script src="{{ '/assets/js/vendor/qrcode.js' | relative_url }}"></script>
 <script defer src="{{ '/assets/js/vendor/jsQR.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/form-utils.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/admin-tabs.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/sorteio.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/meetup-manage.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/survey-results.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/meetup-subscriptions.js' | relative_url }}"></script>

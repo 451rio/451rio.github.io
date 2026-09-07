@@ -1,0 +1,58 @@
+# Perguntas da pesquisa de satisfação.
+#
+# Fonte única usada pela página pública (/pesquisa-de-satisfacao/) e pelo painel
+# da organização (aba "Pesquisa de satisfação" em /minhas-inscricoes/). As duas
+# páginas injetam este arquivo em window.HIBSurveyQuestions via Liquid.
+#
+# A escala é sempre de 1 a 5, do pior para o melhor: options[0] vale 1 e
+# options[4] vale 5. O campo `key` é o nome enviado para a API e precisa bater
+# com SURVEY_QUESTIONS no worker (workers/meetup-api/src/index.js).
+- key: preEventCommunication
+  short: Comunicação pré-evento
+  label: "O que você achou da comunicação pré-evento (e-mails, redes sociais e divulgação do meetup no geral)?"
+  options: ["Péssima", "Ruim", "Regular", "Boa", "Excelente"]
+- key: organization
+  short: Organização
+  label: "Como você avalia a organização do evento (recepção, check-in, pontualidade, clareza das informações, organização do espaço físico...)?"
+  options: ["Péssima", "Ruim", "Regular", "Boa", "Excelente"]
+- key: venue
+  short: Local
+  label: "Como foi a sua experiência com o local do evento (proximidade, transporte, limpeza, mobília, segurança...)?"
+  options: ["Péssima", "Ruim", "Regular", "Boa", "Excelente"]
+- key: techInfrastructure
+  short: Infraestrutura tecnológica
+  label: "Como você avalia a infraestrutura tecnológica do evento (altura do som, resolução dos slides, luminosidade do local...)?"
+  options: ["Péssima", "Ruim", "Regular", "Boa", "Excelente"]
+- key: talks
+  short: Palestras
+  label: "O que você achou das palestras deste meetup (relevância dos temas, clareza na transmissão do conteúdo, velocidade das apresentações, expertise de palestrantes...)?"
+  options: ["Péssimas", "Ruins", "Regulares", "Boas", "Excelentes"]
+- key: coffeeBreak
+  short: Coffee-break
+  label: "O que você achou do coffee-break (quantidade, variedade, qualidade...)?"
+  options: ["Péssimo", "Ruim", "Regular", "Bom", "Excelente"]
+- key: rafflePrizes
+  short: Brindes sorteados
+  label: "O que você achou dos brindes sorteados (utilidade, qualidade, atratividade, diversidade...)?"
+  options: ["Péssimos", "Ruins", "Regulares", "Bons", "Excelentes"]
+- key: networking
+  short: Networking
+  label: "Você teve boas oportunidades de networking durante essa edição presencial do Hack in Brasil?"
+  options: ["De jeito nenhum", "Não", "Mais ou menos", "Sim", "Com certeza"]
+- key: overallExperience
+  short: Experiência geral
+  label: "Como você avalia a sua experiência geral?"
+  options: ["Péssima", "Ruim", "Regular", "Boa", "Excelente"]
+- key: expectations
+  short: Expectativas
+  label: "O Hack in Brasil atendeu às suas expectativas?"
+  options:
+    - "O evento me decepcionou muito"
+    - "O evento me decepcionou"
+    - "Atendeu parcialmente"
+    - "Atendeu totalmente"
+    - "Expectativas superadas"
+- key: recommendation
+  short: Indicaria o evento
+  label: "Você indicaria o Hack in Brasil para outras pessoas?"
+  options: ["De jeito nenhum", "Não", "Mais ou menos", "Sim", "Com certeza"]

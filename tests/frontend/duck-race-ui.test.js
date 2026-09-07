@@ -129,7 +129,7 @@ describe("duck race page gating", () => {
 
     const { window } = mounted;
     expect(window.document.getElementById("duckrace-section").hidden).toBe(true);
-    expect(window.document.getElementById("admin-checkin-section").hidden).toBe(true);
+    expect(window.document.getElementById("admin-panel").hidden).toBe(true);
     expect(mounted.errors).toEqual([]);
   });
 
@@ -393,7 +393,7 @@ describe("login feedback follows the site pattern", () => {
     expect(account).toContain('id="duckrace-section"');
 
     expect(account).toMatch(/id="duckrace-section"[^>]*\shidden/);
-    expect(account).toMatch(/id="admin-checkin-section"[^>]*\shidden/);
+    expect(account).toMatch(/id="admin-panel"[^>]*\shidden/);
 
     const subscriptions = fs.readFileSync(path.join(ROOT, "assets", "js", "meetup-subscriptions.js"), "utf8");
     const startCalls = subscriptions.match(/HIBDuckRace\.start\(/g) || [];
