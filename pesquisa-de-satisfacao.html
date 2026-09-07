@@ -45,18 +45,13 @@ permalink: /pesquisa-de-satisfacao/
         </legend>
         <div class="survey-scale">
           {% for option in question.options %}
-          <label class="survey-option" data-value="{{ forloop.index }}" title="{{ option }}">
+          <label class="survey-option" data-value="{{ forloop.index }}">
             <input type="radio" name="{{ question.key }}" value="{{ forloop.index }}" required>
             <span class="survey-option-value">{{ forloop.index }}</span>
             <span class="survey-option-label">{{ option }}</span>
           </label>
           {% endfor %}
         </div>
-        <div class="survey-scale-ends" aria-hidden="true">
-          <span>{{ question.options | first }}</span>
-          <span>{{ question.options | last }}</span>
-        </div>
-        <p class="survey-selected" data-for="{{ question.key }}" aria-hidden="true"></p>
       </fieldset>
       {% endfor %}
 

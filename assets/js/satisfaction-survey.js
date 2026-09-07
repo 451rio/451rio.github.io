@@ -65,18 +65,9 @@
     }
   }
 
-  function syncSelectedLabel(question) {
-    const target = form.querySelector(`.survey-selected[data-for="${question.key}"]`);
-    if (!target) return;
-    const checked = form.querySelector(`input[name="${question.key}"]:checked`);
-    const options = Array.isArray(question.options) ? question.options : [];
-    target.textContent = checked ? (options[Number(checked.value) - 1] || "") : "";
-  }
-
   form.addEventListener("change", function (event) {
     const question = questions.find((item) => item.key === event.target.name);
     if (question) {
-      syncSelectedLabel(question);
       syncProgress();
     }
     if (commentsCount && event.target === commentsInput) {

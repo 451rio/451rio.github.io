@@ -98,11 +98,6 @@ function renderQuestions(window) {
     });
     fieldset.appendChild(scale);
 
-    const selected = window.document.createElement("p");
-    selected.className = "survey-selected";
-    selected.dataset.for = question.key;
-    fieldset.appendChild(selected);
-
     fields.insertBefore(fieldset, openQuestion);
   }
 }
@@ -234,17 +229,9 @@ describe("public satisfaction survey page", () => {
     expect(fill.style.width).toBe(`${(1 / QUESTIONS.length) * 100}%`);
   });
 
-  it("mirrors the chosen option label, which the phone layout hides in the pill", async () => {
-    mounted = mountSurveyPage();
-    await waitFor(gateOpen(mounted));
-
-    const { window } = mounted;
-    const option = window.document.querySelector('input[name="talks"][value="2"]');
-    option.checked = true;
-    option.dispatchEvent(new window.Event("change", { bubbles: true }));
-
-    const selected = window.document.querySelector('.survey-selected[data-for="talks"]');
-    expect(selected.textContent).toBe("Ruim");
+  it("shows every option label next to its number", () => {
+    expect(SURVEY_PAGE).toContain('class="survey-option-label"');
+    expect(SURVEY_PAGE).toContain("{{ option }}");
   });
 
   it("refuses to submit while a question is unanswered and says which one", async () => {
