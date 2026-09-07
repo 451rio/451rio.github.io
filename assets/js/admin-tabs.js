@@ -1,7 +1,4 @@
 (function () {
-  // Organiza as ferramentas da organização em abas: só o painel selecionado
-  // fica visível. Cada módulo (check-in, sorteio, meetups, pesquisa) continua
-  // controlando o próprio conteúdo dentro do painel.
   const tablist = document.getElementById("admin-tabs");
   if (!tablist) return;
 

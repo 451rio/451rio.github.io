@@ -48,6 +48,48 @@
     }
   }
 
+  const progressFill = document.getElementById("survey-progress-fill");
+  const progressLabel = document.getElementById("survey-progress-label");
+  const commentsInput = document.getElementById("survey-comments");
+  const commentsCount = document.getElementById("survey-comments-count");
+
+  function answeredCount() {
+    return questions.filter((question) => form.querySelector(`input[name="${question.key}"]:checked`)).length;
+  }
+
+  function syncProgress() {
+    const answered = answeredCount();
+    if (progressFill) progressFill.style.width = `${(answered / questions.length) * 100}%`;
+    if (progressLabel) {
+      progressLabel.textContent = `${answered} de ${questions.length} respondidas`;
+    }
+  }
+
+  function syncSelectedLabel(question) {
+    const target = form.querySelector(`.survey-selected[data-for="${question.key}"]`);
+    if (!target) return;
+    const checked = form.querySelector(`input[name="${question.key}"]:checked`);
+    const options = Array.isArray(question.options) ? question.options : [];
+    target.textContent = checked ? (options[Number(checked.value) - 1] || "") : "";
+  }
+
+  form.addEventListener("change", function (event) {
+    const question = questions.find((item) => item.key === event.target.name);
+    if (question) {
+      syncSelectedLabel(question);
+      syncProgress();
+    }
+    if (commentsCount && event.target === commentsInput) {
+      commentsCount.textContent = String(commentsInput.value.length);
+    }
+  });
+
+  if (commentsInput && commentsCount) {
+    commentsInput.addEventListener("input", function () {
+      commentsCount.textContent = String(commentsInput.value.length);
+    });
+  }
+
   function readAnswers() {
     const payload = {};
     const missing = [];
@@ -109,6 +151,7 @@
 
       if (!res.ok) {
         feedback.show(data.error || "Não foi possível enviar suas respostas.", "error");
+        captchaStatus.hidden = false;
         captcha.render();
         resetSubmitButton();
         return;
@@ -122,9 +165,11 @@
 
       form.reset();
       formFields.hidden = true;
+      captchaStatus.hidden = false;
       captchaStatus.textContent = "Pesquisa respondida. Obrigado por contribuir com a comunidade!";
     } catch {
       feedback.show("Erro de conexão. Tente novamente.", "error");
+      captchaStatus.hidden = false;
       captcha.render();
       resetSubmitButton();
     }
@@ -135,6 +180,8 @@
   captcha.render().then(function () {
     if (captcha.ready()) {
       formFields.hidden = false;
+      captchaStatus.hidden = true;
+      syncProgress();
     } else {
       feedback.show("Não foi possível carregar o formulário. Recarregue a página.", "error");
     }

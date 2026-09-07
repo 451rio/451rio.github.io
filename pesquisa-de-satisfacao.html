@@ -5,56 +5,80 @@ permalink: /pesquisa-de-satisfacao/
 ---
 {% include nav.html tag="Pesquisa" back_url="/" back_label="Voltar para início" %}
 
-<main class="meetup-page">
-  <section class="meetup-card">
+<main class="meetup-page survey-page">
+  <section class="meetup-card survey-hero">
     <p class="hero-kicker">Sua opinião</p>
     <h1 class="meetup-title">Pesquisa de satisfação</h1>
     <p class="meetup-subtitle">
       Agradecemos por participar do Hack in Brasil! Compartilhe conosco como foi a sua experiência,
       para que possamos melhorar para as próximas edições. E não tente hackear o formulário!
     </p>
-    <p class="survey-anon-badge">Resposta anônima — não pedimos nome, e-mail nem documento.</p>
+    <div class="survey-chips">
+      <span class="survey-chip">Anônima</span>
+      <span class="survey-chip">~2 minutos</span>
+      <span class="survey-chip survey-chip--event" id="survey-meetup-title">Última edição</span>
+    </div>
   </section>
 
-  <section class="meetup-card">
-    <h2 id="survey-meetup-title">Como foi o meetup para você?</h2>
-    <form id="survey-form" class="registration-form"
-          data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev"
-          data-meetup-slug="meetup-03-09-2026">
-      <div class="registration-field registration-field-full">
-        <p class="registration-help" id="survey-captcha-status" role="status" aria-live="polite">Verificação de segurança: preparando...</p>
-      </div>
-      <div id="survey-form-fields" class="form-gate" hidden>
-        <p class="registration-required-note">Campos marcados com <span class="req" aria-hidden="true">*</span> são obrigatórios.</p>
+  <form id="survey-form" class="survey-form"
+        data-api-base="https://hackinbrasil-meetup-api.hi-c21.workers.dev"
+        data-meetup-slug="meetup-03-09-2026">
+    <p class="survey-captcha" id="survey-captcha-status" role="status" aria-live="polite">
+      Verificação de segurança: preparando...
+    </p>
 
-        {% for question in site.data.satisfaction_survey %}
-        <fieldset class="registration-field registration-field-full registration-fieldset survey-question">
-          <legend>{{ question.label }}</legend>
-          <div class="registration-radio-group survey-scale">
-            {% for option in question.options %}
-            <label class="registration-radio survey-scale-option">
-              <input type="radio" name="{{ question.key }}" value="{{ forloop.index }}" required>
-              <span class="survey-scale-value">{{ forloop.index }}</span>
-              <span>{{ option }}</span>
-            </label>
-            {% endfor %}
-          </div>
-        </fieldset>
-        {% endfor %}
-
-        <div class="registration-field registration-field-full">
-          <label for="survey-comments">Deixe aqui seus mais sinceros comentários!</label>
-          <textarea id="survey-comments" class="registration-input registration-textarea" name="comments"
-                    rows="5" maxlength="2000" placeholder="Opcional. O que funcionou bem, o que podemos melhorar..."></textarea>
-          <small class="registration-help">Opcional, até 2000 caracteres.</small>
+    <div id="survey-form-fields" hidden>
+      <div class="survey-progress">
+        <div class="survey-progress-track">
+          <span class="survey-progress-fill" id="survey-progress-fill"></span>
         </div>
-
-        <div class="registration-actions">
-          <button class="btn btn-primary" type="submit" id="survey-submit">Enviar respostas</button>
-        </div>
+        <p class="survey-progress-label" id="survey-progress-label" role="status" aria-live="polite">
+          0 de {{ site.data.satisfaction_survey | size }} respondidas
+        </p>
       </div>
-    </form>
-  </section>
+
+      {% for question in site.data.satisfaction_survey %}
+      <fieldset class="survey-question">
+        <legend class="survey-question-legend">
+          <span class="survey-question-index">{% if forloop.index < 10 %}0{% endif %}{{ forloop.index }}</span>
+          <span class="survey-question-text">{{ question.label }}</span>
+        </legend>
+        <div class="survey-scale">
+          {% for option in question.options %}
+          <label class="survey-option" data-value="{{ forloop.index }}" title="{{ option }}">
+            <input type="radio" name="{{ question.key }}" value="{{ forloop.index }}" required>
+            <span class="survey-option-value">{{ forloop.index }}</span>
+            <span class="survey-option-label">{{ option }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="survey-scale-ends" aria-hidden="true">
+          <span>{{ question.options | first }}</span>
+          <span>{{ question.options | last }}</span>
+        </div>
+        <p class="survey-selected" data-for="{{ question.key }}" aria-hidden="true"></p>
+      </fieldset>
+      {% endfor %}
+
+      <fieldset class="survey-question survey-question--open">
+        <legend class="survey-question-legend">
+          <span class="survey-question-index">{{ site.data.satisfaction_survey | size | plus: 1 }}</span>
+          <span class="survey-question-text">Deixe aqui seus mais sinceros comentários!</span>
+        </legend>
+        <label class="survey-visually-hidden" for="survey-comments">Comentários</label>
+        <textarea id="survey-comments" class="survey-textarea" name="comments" rows="5" maxlength="2000"
+                  placeholder="O que funcionou bem, o que podemos melhorar..."></textarea>
+        <p class="survey-counter">
+          <span id="survey-comments-count">0</span>/2000 · opcional
+        </p>
+      </fieldset>
+
+      <div class="survey-actions">
+        <button class="btn btn-primary survey-submit" type="submit" id="survey-submit">Enviar respostas</button>
+        <p class="survey-actions-note">Suas respostas não são vinculadas ao seu nome, e-mail ou inscrição.</p>
+      </div>
+    </div>
+  </form>
 </main>
 
 <div class="modal" id="surveyFeedbackModal" aria-hidden="true">

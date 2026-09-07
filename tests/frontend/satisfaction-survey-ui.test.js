@@ -15,8 +15,6 @@ const SURVEY_JS = fs.readFileSync(path.join(ROOT, "assets", "js", "satisfaction-
 const RESULTS_JS = fs.readFileSync(path.join(ROOT, "assets", "js", "survey-results.js"), "utf8");
 const TABS_JS = fs.readFileSync(path.join(ROOT, "assets", "js", "admin-tabs.js"), "utf8");
 
-// Espelha _data/satisfaction_survey.yml: o Jekyll injeta o mesmo array em
-// window.HIBSurveyQuestions nas duas páginas.
 const QUESTIONS = [
   { key: "preEventCommunication", short: "Comunicação pré-evento", label: "Comunicação?" },
   { key: "organization", short: "Organização", label: "Organização?" },
@@ -45,37 +43,67 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// O laço Liquid das perguntas some no stripLiquid, então recriamos os
-// fieldsets exatamente como o template os renderiza.
+async function waitFor(condition, timeout = 4000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (condition()) return true;
+    await sleep(10);
+  }
+  return condition();
+}
+
+function gateOpen(mounted) {
+  return () => mounted.window.document.getElementById("survey-form-fields").hidden === false;
+}
+
 function renderQuestions(window) {
   const fields = window.document.getElementById("survey-form-fields");
-  for (const stale of fields.querySelectorAll(".survey-question")) stale.remove();
-
-  const comments = fields.querySelector(".registration-field:last-of-type");
+  const openQuestion = fields.querySelector(".survey-question--open");
+  for (const stale of fields.querySelectorAll(".survey-question:not(.survey-question--open)")) {
+    stale.remove();
+  }
 
   for (const question of QUESTIONS) {
     const fieldset = window.document.createElement("fieldset");
-    fieldset.className = "registration-field registration-field-full registration-fieldset survey-question";
+    fieldset.className = "survey-question";
+
     const legend = window.document.createElement("legend");
+    legend.className = "survey-question-legend";
     legend.textContent = question.label;
     fieldset.appendChild(legend);
 
-    const group = window.document.createElement("div");
-    group.className = "registration-radio-group survey-scale";
+    const scale = window.document.createElement("div");
+    scale.className = "survey-scale";
     question.options.forEach((option, index) => {
       const label = window.document.createElement("label");
-      label.className = "registration-radio survey-scale-option";
+      label.className = "survey-option";
+      label.dataset.value = String(index + 1);
+
       const input = window.document.createElement("input");
       input.type = "radio";
       input.name = question.key;
       input.value = String(index + 1);
       input.required = true;
-      label.appendChild(input);
-      group.appendChild(label);
-    });
 
-    fieldset.appendChild(group);
-    fields.insertBefore(fieldset, comments);
+      const value = window.document.createElement("span");
+      value.className = "survey-option-value";
+      value.textContent = String(index + 1);
+
+      const text = window.document.createElement("span");
+      text.className = "survey-option-label";
+      text.textContent = option;
+
+      label.append(input, value, text);
+      scale.appendChild(label);
+    });
+    fieldset.appendChild(scale);
+
+    const selected = window.document.createElement("p");
+    selected.className = "survey-selected";
+    selected.dataset.for = question.key;
+    fieldset.appendChild(selected);
+
+    fields.insertBefore(fieldset, openQuestion);
   }
 }
 
@@ -180,25 +208,53 @@ describe("public satisfaction survey page", () => {
     const fields = mounted.window.document.getElementById("survey-form-fields");
     expect(fields.hidden).toBe(true);
 
-    await sleep(200);
-    expect(fields.hidden).toBe(false);
+    expect(await waitFor(gateOpen(mounted))).toBe(true);
     expect(mounted.errors).toEqual([]);
   });
 
   it("never asks for name, e-mail or document", () => {
     expect(SURVEY_PAGE).not.toMatch(/type="email"/);
     expect(SURVEY_PAGE).not.toMatch(/name="(name|email|document|phone)"/);
-    expect(SURVEY_PAGE).toContain("Resposta anônima");
+    expect(SURVEY_PAGE).toContain("Anônima");
+  });
+
+  it("tracks progress as the questions are answered", async () => {
+    mounted = mountSurveyPage();
+    await waitFor(gateOpen(mounted));
+
+    const { window } = mounted;
+    const label = window.document.getElementById("survey-progress-label");
+    const fill = window.document.getElementById("survey-progress-fill");
+
+    const first = window.document.querySelector('input[name="venue"][value="3"]');
+    first.checked = true;
+    first.dispatchEvent(new window.Event("change", { bubbles: true }));
+
+    expect(label.textContent).toBe(`1 de ${QUESTIONS.length} respondidas`);
+    expect(fill.style.width).toBe(`${(1 / QUESTIONS.length) * 100}%`);
+  });
+
+  it("mirrors the chosen option label, which the phone layout hides in the pill", async () => {
+    mounted = mountSurveyPage();
+    await waitFor(gateOpen(mounted));
+
+    const { window } = mounted;
+    const option = window.document.querySelector('input[name="talks"][value="2"]');
+    option.checked = true;
+    option.dispatchEvent(new window.Event("change", { bubbles: true }));
+
+    const selected = window.document.querySelector('.survey-selected[data-for="talks"]');
+    expect(selected.textContent).toBe("Ruim");
   });
 
   it("refuses to submit while a question is unanswered and says which one", async () => {
     mounted = mountSurveyPage();
-    await sleep(200);
+    await waitFor(gateOpen(mounted));
 
     const { window } = mounted;
     window.document.querySelector('input[name="organization"][value="4"]').checked = true;
     window.document.getElementById("survey-form").dispatchEvent(new window.Event("submit"));
-    await sleep(50);
+    await waitFor(() => window.document.getElementById("survey-feedback-message").textContent !== "");
 
     expect(mounted.calls.some((call) => call.target.endsWith("/survey"))).toBe(false);
     const message = window.document.getElementById("survey-feedback-message").textContent;
@@ -208,7 +264,7 @@ describe("public satisfaction survey page", () => {
 
   it("sends every answer on the 1-5 scale plus the optional comment", async () => {
     mounted = mountSurveyPage();
-    await sleep(200);
+    await waitFor(gateOpen(mounted));
 
     const { window } = mounted;
     for (const question of QUESTIONS) {
@@ -219,7 +275,7 @@ describe("public satisfaction survey page", () => {
     window.document.getElementById("survey-comments").value = "  Muito bom  ";
 
     window.document.getElementById("survey-form").dispatchEvent(new window.Event("submit"));
-    await sleep(100);
+    await waitFor(() => mounted.calls.some((call) => call.target.endsWith("/survey")));
 
     const submission = mounted.calls.find((call) => call.target.endsWith("/survey"));
     expect(submission.method).toBe("POST");
@@ -232,14 +288,14 @@ describe("public satisfaction survey page", () => {
 
   it("hides the form after a successful answer so nobody sends it twice by accident", async () => {
     mounted = mountSurveyPage();
-    await sleep(200);
+    await waitFor(gateOpen(mounted));
 
     const { window } = mounted;
     for (const question of QUESTIONS) {
       window.document.querySelector(`input[name="${question.key}"][value="4"]`).checked = true;
     }
     window.document.getElementById("survey-form").dispatchEvent(new window.Event("submit"));
-    await sleep(100);
+    await waitFor(() => window.document.getElementById("survey-form-fields").hidden === true);
 
     expect(window.document.getElementById("survey-form-fields").hidden).toBe(true);
     expect(window.document.getElementById("surveyFeedbackModal").classList.contains("is-success")).toBe(true);
@@ -272,7 +328,7 @@ describe("survey results in the organisation panel", () => {
 
   it("summarises the answers and charts every question", async () => {
     mounted = mountAdminResults({ results: resultsFixture() });
-    await sleep(100);
+    await waitFor(() => mounted.window.document.querySelectorAll(".survey-stat-value").length > 0);
 
     const { window } = mounted;
     const stats = Array.from(window.document.querySelectorAll(".survey-stat-value")).map(
@@ -282,7 +338,6 @@ describe("survey results in the organisation panel", () => {
     expect(stats[1]).toBe("4,7 / 5");
     expect(stats[2]).toBe("75%");
 
-    // Um card de ranking + um card por pergunta.
     expect(window.document.querySelectorAll(".survey-chart-card").length).toBe(QUESTIONS.length + 1);
     expect(window.document.querySelectorAll(".survey-ranking-row").length).toBe(QUESTIONS.length);
 
@@ -298,7 +353,7 @@ describe("survey results in the organisation panel", () => {
         comments: [{ text: "<img src=x onerror=alert(1)>", createdAt: "2026-09-04 12:00:00" }]
       })
     });
-    await sleep(100);
+    await waitFor(() => mounted.window.document.querySelector(".survey-comment-text") !== null);
 
     const { window } = mounted;
     const comment = window.document.querySelector(".survey-comment-text");
@@ -318,7 +373,9 @@ describe("survey results in the organisation panel", () => {
         }))
       })
     });
-    await sleep(100);
+    await waitFor(() =>
+      mounted.window.document.getElementById("survey-results-status").textContent.includes("Nenhuma resposta")
+    );
 
     const { window } = mounted;
     expect(window.document.getElementById("survey-results-status").textContent).toContain("Nenhuma resposta");

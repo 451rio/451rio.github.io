@@ -17,7 +17,6 @@
   ];
   if (nodes.some((node) => !node)) return;
 
-  // Escala de 1 (pior) a 5 (melhor) — vermelho para verde.
   const SCALE_COLORS = ["#ff6b6b", "#ff9f43", "#f4d74d", "#8fd14f", "#2fc3a2"];
 
   let apiFetch = null;

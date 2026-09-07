@@ -2645,8 +2645,6 @@ async function handleTalkSubmit(request, env, corsOrigin) {
   );
 }
 
-// Perguntas da pesquisa de satisfação. A ordem e as chaves acompanham
-// _data/satisfaction_survey.yml; a escala vai de 1 (pior) a 5 (melhor).
 const SURVEY_QUESTIONS = [
   {key: "preEventCommunication", column: "pre_event_communication"},
   {key: "organization", column: "organization"},
